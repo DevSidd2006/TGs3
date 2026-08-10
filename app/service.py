@@ -28,8 +28,29 @@ class StorageService:
             raise
         return self._repository.get_file(stored.id)
 
-    def list_files(self):
-        return self._repository.list_files()
+    def list_files(self, folder_id: int | None = None):
+        return self._repository.list_files(folder_id)
+
+    def create_folder(self, *, name: str, parent_id: int | None):
+        return self._repository.create_folder(name=name, parent_id=parent_id)
+
+    def rename_folder(self, folder_id: int, name: str):
+        return self._repository.rename_folder(folder_id, name)
+
+    def delete_folder(self, folder_id: int) -> None:
+        return self._repository.delete_folder(folder_id)
+
+    def get_folder(self, folder_id: int):
+        return self._repository.get_folder(folder_id)
+
+    def list_folders(self):
+        return self._repository.list_folders()
+
+    def move_file(self, *, file_id: int, folder_id: int | None):
+        return self._repository.move_file(file_id=file_id, folder_id=folder_id)
+
+    def get_breadcrumb(self, folder_id: int):
+        return self._repository.get_breadcrumb(folder_id)
 
     def search_files(self, query: str):
         return self._repository.search_files(query)

@@ -43,3 +43,21 @@ def test_upload_failure_marks_file_failed(tmp_path: Path):
     files = repository.list_files()
     assert len(files) == 1
     assert files[0].status == "failed"
+
+
+def test_service_folder_delegation(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+    service = StorageService(repository, FakeTelegramStorage(message_id=5, file_id="tg-5"), channel_id=-10099)
+
+    folder = service.create_folder(name="Docs", parent_id=None)
+    assert service.get_folder(folder.id).name == "Docs"
+
+    created = repository.create_uploading(name="a.txt", size_bytes=3, mime_type="text/plain")
+    repository.mark_failed(created.id)
+    moved = service.move_file(file_id=created.id, folder_id=folder.id)
+    assert moved.folder_id == folder.id
+    assert [f.name for f in service.list_files(folder_id=folder.id)] == ["a.txt"]
+    assert service.list_files() == []
+    assert service.get_breadcrumb(folder.id) == [folder]

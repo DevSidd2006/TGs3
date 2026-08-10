@@ -56,14 +56,17 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request, folder_id: int | None = None):
         files = service.list_files(folder_id=folder_id)
+        folders = service.list_folders()
         breadcrumb = service.get_breadcrumb(folder_id) if folder_id is not None else []
+        subfolders = [folder for folder in folders if folder.parent_id == folder_id]
         return templates.TemplateResponse(
             request,
             "index.html",
             {
                 "files": [serialize_file(item) for item in files],
-                "folders": service.list_folders(),
-                "folder_tree": build_folder_tree(service.list_folders()),
+                "folders": [serialize_folder(item) for item in folders],
+                "folder_tree": build_folder_tree(folders),
+                "subfolders": [serialize_folder(item) for item in subfolders],
                 "breadcrumb": [serialize_folder(item) for item in breadcrumb],
                 "current_folder_id": folder_id,
             },

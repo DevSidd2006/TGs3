@@ -7,7 +7,7 @@ def test_dashboard_renders_existing_files(app_client: TestClient):
     response = app_client.get("/")
 
     assert response.status_code == 200
-    assert "File Explorer" in response.text
+    assert "All Files" in response.text
     assert "seed.txt" in response.text
 
 

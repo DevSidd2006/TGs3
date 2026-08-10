@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="app-frame">
+  <!-- Left Sidebar -->
+  <aside class="sidebar">
+    <div>
+      <a href="/" class="brand">
+        <div class="brand-icon">
+          <i class="ph-bold ph-telegram-logo"></i>
+        </div>
+        <span class="brand-name">TeleVault</span>
+      </a>
+
+      <button class="btn-create-new">
+        <i class="ph-bold ph-plus"></i> Create New
+      </button>
+
+      <ul class="nav-list">
+        <li class="nav-item active">
+          <a href="/"><i class="ph-bold ph-house"></i> Dashboard / All Files</a>
+        </li>
+        <li class="nav-item">
+          <a href="#"><i class="ph-bold ph-folder"></i> My Files</a>
+        </li>
+        <li class="nav-item">
+          <a href="#"><i class="ph-bold ph-users-three"></i> Shared with Me</a>
+        </li>
+        <li class="nav-item">
+          <a href="#"><i class="ph-bold ph-image"></i> Photos</a>
+        </li>
+        <li class="nav-item">
+          <a href="#"><i class="ph-bold ph-gear"></i> Settings</a>
+        </li>
+        <li class="nav-item">
+          <a href="#"><i class="ph-bold ph-trash"></i> Recycle Bin</a>
+        </li>
+      </ul>
+    </div>
+
+    <!-- User Profile Pill -->
+    <div class="user-profile">
+      <div class="avatar">TG</div>
+      <div class="user-info">
+        <span class="user-name">Telegram User</span>
+        <span class="user-role">Cloud Admin</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Right Main Area -->
+  <div class="main-area">
+    <!-- Top Bar -->
+    <header class="top-bar">
+      <div class="search-input-wrapper">
+        <i class="ph-bold ph-magnifying-glass"></i>
+        <input id="search-input" class="search-input" type="search" placeholder="Search files, folders, backups...">
+      </div>
+
+      <div class="top-bar-actions">
+        <button class="icon-btn" title="Notifications"><i class="ph-bold ph-bell"></i></button>
+        <button class="icon-btn" title="Settings"><i class="ph-bold ph-sliders"></i></button>
+      </div>
+    </header>
+
+    <!-- Main Content Body -->
+    <main class="content-body">
+      <!-- Hero Row: Drag & Drop Card + Storage Analytics Card -->
+      <div class="hero-dashboard-grid">
+        <!-- Drag & Drop Box -->
+        <div id="drop-zone" class="drag-drop-card">
+          <div class="upload-icon-glow">
+            <i class="ph-bold ph-cloud-arrow-up"></i>
+          </div>
+          <div class="upload-title">
+            Drag & Drop files or <label for="file-input-drop">browse</label> to upload
+          </div>
+          <div class="upload-subtitle">Stored securely on private Telegram channel backend</div>
+          <input id="file-input-drop" type="file" multiple>
+        </div>
+
+        <!-- Storage Analytics Box (Donut Summary Widget) -->
+        <div class="storage-widget-card">
+          <div>
+            <div class="widget-header">
+              <span class="widget-title">Storage Breakdown</span>
+              <span class="widget-subtitle">Unlimited</span>
+            </div>
+            <div class="storage-progress-bar">
+              <div class="storage-progress-fill"></div>
+            </div>
+          </div>
+
+          <div class="storage-breakdown">
+            <div class="breakdown-item">
+              <div class="dot-label"><span class="dot dot-cyan"></span> Active Files</div>
+              <span class="breakdown-value" id="storage-active-count">{{ files|length }} files</span>
+            </div>
+            <div class="breakdown-item">
+              <div class="dot-label"><span class="dot dot-purple"></span> Telegram Sync</div>
+              <span class="breakdown-value">100% Online</span>
+            </div>
+            <div class="breakdown-item">
+              <div class="dot-label"><span class="dot dot-indigo"></span> Encryption</div>
+              <span class="breakdown-value">AES-256</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Action Bar -->
+      <div class="files-action-bar">
+        <div class="breadcrumb-title">
+          File Explorer <span>&rsaquo; My Files</span>
+        </div>
+
+        <div class="action-buttons-group">
+          <label class="btn-secondary" style="cursor: pointer;">
+            <i class="ph-bold ph-upload"></i> Upload
+            <input id="file-input-header" type="file" style="display: none;">
+          </label>
+          <button class="btn-secondary"><i class="ph-bold ph-share"></i> Share</button>
+        </div>
+      </div>
+
+      <!-- File Table Card -->
+      <div class="table-card">
+        <table class="mock-file-table">
+          <thead>
+            <tr>
+              <th style="width: 40%;">Name</th>
+              <th>Type</th>
+              <th>Date</th>
+              <th>Size</th>
+              <th>Status</th>
+              <th style="text-align: right;">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="file-table-body">
+            {% for file in files %}
+            <tr>
+              <td>
+                <div class="file-title-wrapper">
+                  <div class="file-badge-icon {% if 'image' in (file.mime_type or '') %}icon-img{% elif 'pdf' in (file.mime_type or '') %}icon-pdf{% elif 'zip' in (file.mime_type or '') %}icon-zip{% else %}icon-doc{% endif %}">
+                    <i class="ph-bold {% if 'image' in (file.mime_type or '') %}ph-image{% elif 'pdf' in (file.mime_type or '') %}ph-file-pdf{% elif 'zip' in (file.mime_type or '') %}ph-file-zip{% else %}ph-file-text{% endif %}"></i>
+                  </div>
+                  <a href="/view/files/{{ file.id }}" class="file-name-text">{{ file.name }}</a>
+                </div>
+              </td>
+              <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted);">{{ file.mime_type or "DOCUMENT" }}</span></td>
+              <td><span style="color: var(--text-muted); font-size: 12px;">{{ file.uploaded_at[:10] if file.uploaded_at else "Today" }}</span></td>
+              <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px;">{{ file.size_bytes }} B</span></td>
+              <td>
+                <span class="pill-status pill-{{ file.status }}">
+                  {% if file.status == 'ready' %}Synced{% else %}{{ file.status }}{% endif %}
+                </span>
+              </td>
+              <td>
+                <div class="table-actions">
+                  <button class="link-action preview-trigger" data-id="{{ file.id }}" data-mime="{{ file.mime_type or '' }}" data-name="{{ file.name }}" style="cursor: pointer; background: none; border: none;">Preview</button>
+                  <a href="/files/{{ file.id }}/download" class="link-action">Download</a>
+                  <button class="icon-action-btn"><i class="ph-bold ph-dots-three-vertical"></i></button>
+                </div>
+              </td>
+            </tr>
+            {% else %}
+            <tr>
+              <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
+                No files uploaded yet. Drag and drop files above to start saving.
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- File Preview Overlay -->
+<div id="preview-overlay" class="preview-overlay" hidden>
+  <div class="preview-panel">
+    <div class="preview-header">
+      <span id="preview-name" class="preview-name"></span>
+      <div class="preview-actions">
+        <a id="preview-download" class="link-action" href="#" download>Download</a>
+        <button id="preview-close" class="icon-action-btn" title="Close"><i class="ph-bold ph-x"></i></button>
+      </div>
+    </div>
+    <div id="preview-body" class="preview-body"></div>
+  </div>
+</div>
+{% endblock %}

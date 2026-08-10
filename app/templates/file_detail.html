@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="detail-container">
+  <a href="/" class="back-link">
+    <i class="ph-bold ph-arrow-left"></i> Back to Dashboard
+  </a>
+
+  <div class="detail-header">
+    <div class="detail-icon-box">
+      <i class="ph-bold ph-file"></i>
+    </div>
+    <div class="detail-title-group">
+      <h1>{{ file.name }}</h1>
+      <span class="status-badge status-{{ file.status }}">
+        <i class="ph-bold {% if file.status == 'ready' %}ph-check-circle{% elif file.status == 'uploading' %}ph-spinner-gap spin{% else %}ph-x-circle{% endif %}"></i>
+        {{ file.status }}
+      </span>
+    </div>
+  </div>
+
+  <div class="detail-grid">
+    <div class="detail-card">
+      <label>File ID</label>
+      <span>#{{ file.id }}</span>
+    </div>
+    <div class="detail-card">
+      <label>File Size</label>
+      <span>{{ file.size_bytes }} Bytes</span>
+    </div>
+    <div class="detail-card">
+      <label>MIME Type</label>
+      <span>{{ file.mime_type or "unknown" }}</span>
+    </div>
+    <div class="detail-card">
+      <label>Uploaded At</label>
+      <span style="font-size: 13px;">{{ file.uploaded_at if file.uploaded_at else "Recently" }}</span>
+    </div>
+  </div>
+
+  {% if file.status == 'ready' %}
+  <a href="/files/{{ file.id }}/download" class="btn-download-primary">
+    <i class="ph-bold ph-download-simple"></i> Download File from Telegram
+  </a>
+  {% else %}
+  <button class="btn-download-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
+    <i class="ph-bold ph-clock"></i> File is processing...
+  </button>
+  {% endif %}
+</div>
+{% endblock %}

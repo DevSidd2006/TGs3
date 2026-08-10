@@ -47,24 +47,22 @@ body {
   background-attachment: fixed;
   color: var(--text-main);
   min-height: 100vh;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  padding: 30px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
 }
 
-/* Outer Window Frame matching mockup */
+/* Outer Window Frame full screen */
 .app-frame {
-  width: 100%;
-  max-width: 1200px;
-  height: 840px;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
   background: var(--bg-panel);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-lg);
+  border: none;
+  border-radius: 0;
   display: flex;
   overflow: hidden;
-  box-shadow: 0 30px 60px -12px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(20px);
+  box-shadow: none;
 }
 
 /* Sidebar */

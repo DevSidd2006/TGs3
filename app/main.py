@@ -24,7 +24,27 @@ def serialize_file(stored) -> dict:
         "mime_type": stored.mime_type,
         "status": stored.status,
         "uploaded_at": stored.uploaded_at.isoformat(),
+        "folder_id": getattr(stored, "folder_id", None),
     }
+
+
+def serialize_folder(folder) -> dict:
+    return {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id}
+
+
+def build_folder_tree(folders: list) -> list[dict]:
+    children: dict[int | None, list[dict]] = {f.id: [] for f in folders}
+    roots: list[dict] = []
+    by_id = {f.id: f for f in folders}
+    for folder in folders:
+        node = {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id, "children": children[folder.id]}
+        if folder.parent_id is None:
+            roots.append(node)
+        elif folder.parent_id in by_id:
+            children[folder.parent_id].append(node)
+        else:
+            roots.append(node)
+    return roots
 
 
 def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None) -> FastAPI:
@@ -34,11 +54,19 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
     @app.get("/", response_class=HTMLResponse)
-    def index(request: Request):
+    def index(request: Request, folder_id: int | None = None):
+        files = service.list_files(folder_id=folder_id)
+        breadcrumb = service.get_breadcrumb(folder_id) if folder_id is not None else []
         return templates.TemplateResponse(
             request,
             "index.html",
-            {"files": [serialize_file(item) for item in service.list_files()]},
+            {
+                "files": [serialize_file(item) for item in files],
+                "folders": service.list_folders(),
+                "folder_tree": build_folder_tree(service.list_folders()),
+                "breadcrumb": [serialize_folder(item) for item in breadcrumb],
+                "current_folder_id": folder_id,
+            },
         )
 
     @app.get("/view/files/{file_id}", response_class=HTMLResponse)
@@ -53,21 +81,60 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         )
 
     @app.post("/files/upload", status_code=201)
-    async def upload(file: UploadFile = File(...)):
+    async def upload(file: UploadFile = File(...), folder_id: int | None = None):
         stored = await service.upload_bytes(
             filename=file.filename or "upload.bin",
             content=await file.read(),
             mime_type=file.content_type,
+            folder_id=folder_id,
         )
         return JSONResponse(serialize_file(stored), status_code=201)
 
     @app.get("/files")
-    def list_files():
-        return [serialize_file(item) for item in service.list_files()]
+    def list_files(folder_id: int | None = None):
+        return [serialize_file(item) for item in service.list_files(folder_id=folder_id)]
 
     @app.get("/files/search")
     def search_files(q: str = Query("")):
         return [serialize_file(item) for item in service.search_files(q)]
+
+    @app.get("/folders")
+    def folder_tree():
+        return build_folder_tree(service.list_folders())
+
+    @app.post("/folders", status_code=201)
+    def create_folder(payload: dict):
+        try:
+            folder = service.create_folder(name=payload.get("name"), parent_id=payload.get("parent_id"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return JSONResponse(serialize_folder(folder), status_code=201)
+
+    @app.patch("/folders/{folder_id}")
+    def rename_folder(folder_id: int, payload: dict):
+        if service.get_folder(folder_id) is None:
+            raise HTTPException(status_code=404, detail=f"folder {folder_id} not found")
+        try:
+            folder = service.rename_folder(folder_id, payload.get("name"))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return serialize_folder(folder)
+
+    @app.delete("/folders/{folder_id}", status_code=204)
+    def delete_folder(folder_id: int):
+        try:
+            service.delete_folder(folder_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return Response(status_code=204)
+
+    @app.post("/files/{file_id}/move")
+    def move_file(file_id: int, payload: dict):
+        try:
+            stored = service.move_file(file_id=file_id, folder_id=payload.get("folder_id"))
+        except ValueError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return serialize_file(stored)
 
     @app.get("/files/{file_id}")
     def file_detail(file_id: int):

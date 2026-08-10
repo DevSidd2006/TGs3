@@ -81,3 +81,63 @@ def test_create_app_builds_routes_from_environment(monkeypatch, tmp_path):
     paths = {route.path for route in app.routes}
     assert "/" in paths
     assert "/files/upload" in paths
+
+
+def test_folder_tree_renders_nested(app_client: TestClient):
+    app_client.post("/folders", json={"name": "Photos", "parent_id": None}).raise_for_status()
+    created = app_client.post("/folders", json={"name": "2024", "parent_id": 1})
+    assert created.status_code == 201
+    folder_id = created.json()["id"]
+    tree = app_client.get("/folders").json()
+    assert tree[0]["name"] == "Photos"
+    assert tree[0]["children"][0]["name"] == "2024"
+
+
+def test_rename_folder_endpoint(app_client: TestClient):
+    created = app_client.post("/folders", json={"name": "Old", "parent_id": None})
+    folder_id = created.json()["id"]
+    renamed = app_client.patch(f"/folders/{folder_id}", json={"name": "New"})
+    assert renamed.status_code == 200
+    assert renamed.json()["name"] == "New"
+
+
+def test_delete_non_empty_folder_returns_409(app_client: TestClient):
+    folder = app_client.post("/folders", json={"name": "Docs", "parent_id": None}).json()
+    app_client.post(f"/folders", json={"name": "Sub", "parent_id": folder["id"]})
+    response = app_client.delete(f"/folders/{folder['id']}")
+    assert response.status_code == 409
+
+
+def test_delete_empty_folder_returns_204(app_client: TestClient):
+    folder = app_client.post("/folders", json={"name": "Empty", "parent_id": None}).json()
+    response = app_client.delete(f"/folders/{folder['id']}")
+    assert response.status_code == 204
+
+
+def test_upload_into_folder(app_client: TestClient):
+    folder = app_client.post("/folders", json={"name": "Docs", "parent_id": None}).json()
+    response = app_client.post(
+        "/files/upload",
+        params={"folder_id": folder["id"]},
+        files={"file": ("a.txt", b"hello", "text/plain")},
+    )
+    assert response.status_code == 201
+    assert response.json()["folder_id"] == folder["id"]
+
+
+def test_move_file_endpoint(app_client: TestClient):
+    folder = app_client.post("/folders", json={"name": "Docs", "parent_id": None}).json()
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("a.txt", b"hello", "text/plain")},
+    ).json()
+    moved = app_client.post(f"/files/{upload['id']}/move", json={"folder_id": folder["id"]})
+    assert moved.status_code == 200
+    assert moved.json()["folder_id"] == folder["id"]
+
+
+def test_dashboard_scoped_to_folder_shows_breadcrumb(app_client: TestClient):
+    folder = app_client.post("/folders", json={"name": "Photos", "parent_id": None}).json()
+    response = app_client.get("/", params={"folder_id": folder["id"]})
+    assert response.status_code == 200
+    assert "Photos" in response.text

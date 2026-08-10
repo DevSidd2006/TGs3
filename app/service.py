@@ -8,8 +8,10 @@ class StorageService:
         self._telegram = telegram
         self._channel_id = channel_id
 
-    async def upload_bytes(self, *, filename: str, content: bytes, mime_type: str | None):
+    async def upload_bytes(self, *, filename: str, content: bytes, mime_type: str | None, folder_id: int | None = None):
         stored = self._repository.create_uploading(name=filename, size_bytes=len(content), mime_type=mime_type)
+        if folder_id is not None:
+            self._repository.move_file(file_id=stored.id, folder_id=folder_id)
         try:
             uploaded = await self._telegram.upload(
                 channel_id=self._channel_id,

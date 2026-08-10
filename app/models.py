@@ -13,3 +13,10 @@ class StoredFile:
     telegram_file_id: str | None
     status: str
     uploaded_at: datetime
+
+
+@dataclass(frozen=True)
+class Folder:
+    id: int
+    name: str
+    parent_id: int | None

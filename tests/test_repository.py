@@ -37,3 +37,12 @@ def test_repository_search_matches_name(tmp_path: Path):
     result = repository.search_files("budget")
 
     assert [item.name for item in result] == ["budget-2026.xlsx"]
+
+
+def test_schema_has_folders_table_and_folder_id_column(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+    assert "folders" in tables
+    columns = {row["name"] for row in connection.execute("PRAGMA table_info(files)")}
+    assert "folder_id" in columns

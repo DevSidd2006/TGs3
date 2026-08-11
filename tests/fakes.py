@@ -38,3 +38,45 @@ class FakeTelegramStorage:
             }
         ]
 
+
+class _AsyncMessages:
+    def __init__(self, messages: list) -> None:
+        self._iterator = iter(messages)
+
+    def __aiter__(self):
+        return self
+
+    async def __anext__(self):
+        try:
+            return next(self._iterator)
+        except StopIteration:
+            raise StopAsyncIteration
+
+
+class FakeTelethonClient:
+    def __init__(self, messages: list) -> None:
+        self._messages = messages
+        self.iter_kwargs: dict | None = None
+
+    def iter_messages(self, entity, **kwargs):
+        self.iter_kwargs = kwargs
+        return _AsyncMessages(self._messages)
+
+
+def make_file_message(message_id: int, *, name: str | None = None, size: int | None = None, mime: str | None = None, has_file: bool = True):
+    class _File:
+        def __init__(self, name: str | None, size: int | None, mime_type: str | None) -> None:
+            self.id = f"file_{message_id}"
+            self.name = name
+            self.size = size
+            self.mime_type = mime_type
+
+    class _Message:
+        id = message_id
+        message = f"caption_{message_id}"
+
+        def __init__(self) -> None:
+            self.file = _File(name, size, mime) if has_file else None
+
+    return _Message()
+

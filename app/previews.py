@@ -15,6 +15,30 @@ IMAGE_MIME_TYPES = {
 
 PDF_MIME_TYPE = "application/pdf"
 
+VIDEO_MIME_TYPES = {
+    "video/mp4",
+    "video/webm",
+    "video/quicktime",
+    "video/x-msvideo",
+    "video/ogg",
+    "video/mpeg",
+}
+
+AUDIO_MIME_TYPES = {
+    "audio/mpeg",
+    "audio/wav",
+    "audio/x-wav",
+    "audio/mp4",
+    "audio/ogg",
+    "audio/aac",
+    "audio/flac",
+}
+
+TEXT_MIME_TYPES = {
+    "text/plain",
+    "text/markdown",
+}
+
 OFFICE_MIME_TYPES = {
     "application/msword",
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -25,8 +49,6 @@ OFFICE_MIME_TYPES = {
     "application/vnd.oasis.opendocument.text",
     "application/vnd.oasis.opendocument.spreadsheet",
     "application/vnd.oasis.opendocument.presentation",
-    "text/plain",
-    "text/markdown",
 }
 
 
@@ -40,6 +62,12 @@ class PreviewRenderer:
         if mime_type in IMAGE_MIME_TYPES:
             return downloaded
         if mime_type == PDF_MIME_TYPE:
+            return downloaded
+        if mime_type in VIDEO_MIME_TYPES:
+            return downloaded
+        if mime_type in AUDIO_MIME_TYPES:
+            return downloaded
+        if mime_type in TEXT_MIME_TYPES:
             return downloaded
         if mime_type not in OFFICE_MIME_TYPES:
             return None

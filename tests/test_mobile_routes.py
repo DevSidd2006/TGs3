@@ -40,7 +40,7 @@ def test_service_worker_served(tmp_path):
     client = make_client(tmp_path)
     response = client.get("/mobile/sw.js")
     assert response.status_code == 200
-    assert "serviceworker" in response.headers.get("content-type", "")
+    assert response.headers["content-type"] == "application/javascript"
     assert "CACHE" in response.text
 
 

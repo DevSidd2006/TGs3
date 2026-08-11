@@ -291,7 +291,7 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return Response(
             content=(MOBILE_DIR / "sw.js").read_text(),
             media_type="application/javascript",
-            headers={"Service-Worker-Allowed": "/", "Content-Type": "application/javascript; serviceworker"},
+            headers={"Service-Worker-Allowed": "/"},
         )
 
     @app.get("/mobile/icons/{name}")

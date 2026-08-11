@@ -76,3 +76,18 @@ def test_sync_from_channel(tmp_path: Path):
     assert files[0].name == "synced_doc.pdf"
     assert files[0].telegram_message_id == 101
 
+
+def test_sync_from_channel_twice_does_not_duplicate(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+    service = StorageService(repository, FakeTelegramStorage(message_id=5, file_id="tg-5"), channel_id=-10099)
+
+    asyncio.run(service.sync_from_channel())
+    asyncio.run(service.sync_from_channel())
+
+    files = service.list_files()
+    assert len(files) == 1
+    assert files[0].name == "synced_doc.pdf"
+    assert files[0].telegram_message_id == 101
+

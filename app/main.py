@@ -279,6 +279,20 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         require_page_route(request)
         return HTMLResponse((MOBILE_DIR / "mobile.html").read_text())
 
+    @app.get("/mobile/mobile.css")
+    def mobile_css():
+        return Response(
+            content=(MOBILE_DIR / "mobile.css").read_text(),
+            media_type="text/css",
+        )
+
+    @app.get("/mobile/mobile.js")
+    def mobile_js():
+        return Response(
+            content=(MOBILE_DIR / "mobile.js").read_text(),
+            media_type="application/javascript",
+        )
+
     @app.get("/mobile/manifest.webmanifest")
     def mobile_manifest():
         return Response(

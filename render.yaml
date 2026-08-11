@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: google-drive-tgs3
+    env: python
+    region: singapore
+    plan: free
+    buildCommand: "pip install ."
+    startCommand: "uvicorn app.main:create_app --factory --host 0.0.0.0 --port $PORT"
+    envVars:
+      - key: TELEGRAM_API_ID
+        sync: false
+      - key: TELEGRAM_API_HASH
+        sync: false
+      - key: TELEGRAM_CHANNEL_ID
+        sync: false
+      - key: TGS3_PASSWORD
+        sync: false
+      - key: DATABASE_PATH
+        value: "/tmp/files.db"
+      - key: TELEGRAM_SESSION
+        value: "/tmp/telegram.session"

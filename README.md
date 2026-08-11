@@ -23,3 +23,9 @@
 - Files are sent to Telegram and indexed in SQLite.
 - Search filters the local SQLite index.
 - Download pulls the file back through the backend.
+
+### Mobile
+
+- Installable PWA at `/mobile` for phone access.
+- Requires login when `TGS3_PASSWORD` is set.
+- See `docs/HOSTING.md` for free internet access via Cloudflare Tunnel.

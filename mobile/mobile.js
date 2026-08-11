@@ -109,7 +109,9 @@ async function refreshFiles(query = "") {
   try {
     const url = query
       ? `/files/search?q=${encodeURIComponent(query)}`
-      : `/files?folder_id=${currentFolderId || ""}`;
+      : currentFolderId
+        ? `/files?folder_id=${currentFolderId}`
+        : "/files";
     const res = await fetch(url);
     if (res.status === 401) { window.location.href = "/login"; return; }
     allFilesCache = await res.json();

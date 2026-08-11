@@ -190,7 +190,9 @@ async function refreshFiles(query = "") {
   try {
     const url = query
       ? `/files/search?q=${encodeURIComponent(query)}`
-      : `/files?folder_id=${currentFolderId || ""}`;
+      : currentFolderId
+        ? `/files?folder_id=${currentFolderId}`
+        : "/files";
     const response = await fetch(url);
     allFilesCache = await response.json();
     renderFileList();

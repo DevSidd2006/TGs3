@@ -128,3 +128,32 @@ class TestFolderRepository:
         trip = repository.create_folder(name="Trip", parent_id=year.id)
         crumbs = repository.get_breadcrumb(trip.id)
         assert [(f.id, f.name) for f in crumbs] == [(root.id, "Photos"), (year.id, "2024"), (trip.id, "Trip")]
+
+
+def test_upsert_synced_file_updates_existing_row(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+
+    first = repository.upsert_synced_file(
+        name="report.pdf",
+        size_bytes=100,
+        mime_type="application/pdf",
+        telegram_channel_id=-1005,
+        telegram_message_id=42,
+        telegram_file_id="file_42",
+    )
+    second = repository.upsert_synced_file(
+        name="report-v2.pdf",
+        size_bytes=200,
+        mime_type="application/pdf",
+        telegram_channel_id=-1005,
+        telegram_message_id=42,
+        telegram_file_id="file_42_new",
+    )
+
+    assert first.id == second.id
+    files = repository.list_files()
+    assert len(files) == 1
+    assert files[0].name == "report-v2.pdf"
+    assert files[0].telegram_file_id == "file_42_new"

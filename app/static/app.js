@@ -199,12 +199,13 @@ async function refreshFiles(query = "") {
   }
 }
 
-async function uploadFile(file) {
+async function uploadFile(file, folderId = null) {
   const formData = new FormData();
   formData.append("file", file);
 
   try {
-    const folderParam = currentFolderId ? `?folder_id=${currentFolderId}` : "";
+    const targetFolderId = folderId ?? currentFolderId;
+    const folderParam = targetFolderId ? `?folder_id=${targetFolderId}` : "";
     const response = await fetch(`/files/upload${folderParam}`, {
       method: "POST",
       body: formData,
@@ -216,6 +217,77 @@ async function uploadFile(file) {
     }
   } catch (err) {
     console.error("Upload error:", err);
+  }
+}
+
+async function findChildFolder(folderId, name) {
+  const res = await fetch("/folders");
+  if (!res.ok) return null;
+  const tree = await res.json();
+  const findNode = (nodes, id) => {
+    for (const n of nodes) {
+      if (n.id === id) return n;
+      if (n.children) {
+        const found = findNode(n.children, id);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  const node = findNode(tree, folderId);
+  const children = folderId ? (node ? node.children || [] : []) : tree;
+  return children.find((c) => c.name === name) || null;
+}
+
+async function ensureFolderPath(parts, rootParentId) {
+  let parentId = rootParentId;
+  for (const part of parts) {
+    const existing = await findChildFolder(parentId, part);
+    if (existing) {
+      parentId = existing.id;
+      continue;
+    }
+    const res = await fetch("/folders", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: part, parent_id: parentId }),
+    });
+    if (!res.ok) throw new Error(`Failed to create folder ${part}`);
+    const folder = await res.json();
+    parentId = folder.id;
+  }
+  return parentId;
+}
+
+async function uploadFolder(fileList) {
+  const rootParentId = currentFolderId;
+  const grouped = {};
+  for (const file of Array.from(fileList)) {
+    const rel = file.webkitRelativePath || file.name;
+    const parts = rel.split("/");
+    parts.pop();
+    const key = parts.join("/");
+    if (!grouped[key]) grouped[key] = [];
+    grouped[key].push(file);
+  }
+  const folderIdCache = {};
+  for (const key of Object.keys(grouped)) {
+    const parts = key ? key.split("/") : [];
+    let leafId = rootParentId;
+    if (parts.length) {
+      if (!(key in folderIdCache)) {
+        try {
+          folderIdCache[key] = await ensureFolderPath(parts, rootParentId);
+        } catch (err) {
+          alert("Failed to create folder structure. See console for details.");
+          continue;
+        }
+      }
+      leafId = folderIdCache[key];
+    }
+    for (const file of grouped[key]) {
+      await uploadFile(file, leafId);
+    }
   }
 }
 
@@ -440,6 +512,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (e.target.files && e.target.files[0]) {
       Array.from(e.target.files).forEach(file => uploadFile(file));
     }
+  });
+
+  const folderInputHeader = document.getElementById("folder-input-header");
+  const folderInputDrop = document.getElementById("folder-input-drop");
+
+  folderInputHeader?.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) {
+      uploadFolder(e.target.files);
+    }
+    e.target.value = "";
+  });
+
+  folderInputDrop?.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) {
+      uploadFolder(e.target.files);
+    }
+    e.target.value = "";
   });
 
   if (dropZone) {

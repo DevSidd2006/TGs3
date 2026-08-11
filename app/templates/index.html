@@ -47,6 +47,9 @@
           <button type="button" class="dropdown-item" onclick="document.getElementById('file-input-header').click()">
             <i class="ph-bold ph-file-arrow-up"></i> File upload
           </button>
+          <button type="button" class="dropdown-item" onclick="document.getElementById('folder-input-header').click()">
+            <i class="ph-bold ph-folder-open"></i> Folder upload
+          </button>
           <button type="button" class="dropdown-item" onclick="openFolderModal('create', currentFolderId)">
             <i class="ph-bold ph-folder-plus"></i> New folder
           </button>
@@ -54,6 +57,7 @@
       </div>
 
       <input id="file-input-header" type="file" style="display: none;" multiple>
+      <input id="folder-input-header" type="file" webkitdirectory multiple style="display: none;">
 
       <!-- Sidebar Navigation Menu -->
       <nav class="sidebar-nav">
@@ -110,6 +114,7 @@
           <span>Drag and drop files here to upload to TGS3</span>
         </div>
         <input id="file-input-drop" type="file" multiple style="display: none;">
+        <input id="folder-input-drop" type="file" webkitdirectory multiple style="display: none;">
       </div>
 
       <!-- Folders Section -->

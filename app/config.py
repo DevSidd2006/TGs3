@@ -17,6 +17,10 @@ class Settings:
     database_path: Path
     host: str = "127.0.0.1"
     port: int = 8000
+    tgs3_user: str = "admin"
+    tgs3_password: str = ""
+    session_ttl_days: int = 30
+    secure_cookie: bool = True
 
 
 def load_settings() -> Settings:
@@ -28,4 +32,8 @@ def load_settings() -> Settings:
         database_path=Path(os.environ["DATABASE_PATH"]),
         host=os.environ.get("APP_HOST", "127.0.0.1"),
         port=int(os.environ.get("APP_PORT", "8000")),
+        tgs3_user=os.environ.get("TGS3_USER", "admin"),
+        tgs3_password=os.environ.get("TGS3_PASSWORD", ""),
+        session_ttl_days=int(os.environ.get("TGS3_SESSION_TTL_DAYS", "30")),
+        secure_cookie=os.environ.get("TGS3_SECURE_COOKIE", "1") == "1",
     )

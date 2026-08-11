@@ -1,17 +1,19 @@
 from contextlib import asynccontextmanager
+from datetime import timedelta
 from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from telethon import TelegramClient
 
+from app.auth import hash_password, verify_password
 from app.config import load_settings
 from app.db import connect_db, ensure_schema
 from app.previews import PreviewRenderer
-from app.repository import FileRepository
+from app.repository import AuthRepository, FileRepository
 from app.service import StorageService
 from app.telegram_bridge import TelegramStorage, TelethonStorage
 
@@ -60,15 +62,86 @@ def build_folder_tree(folders: list) -> list[dict]:
     return roots
 
 
-def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None) -> FastAPI:
+class RedirectRequest(Exception):
+    def __init__(self, location: str = "/login") -> None:
+        self.location = location
+
+
+def require_auth(request: Request, *, auth_password: str, auth_repo: AuthRepository) -> None:
+    """For JSON API endpoints: raise 401 when unauthenticated."""
+    if not auth_password:
+        return
+    token = request.cookies.get("tgs3_session")
+    user = auth_repo.get_session_user(token) if token else None
+    if user is None:
+        raise HTTPException(status_code=401, detail="not authenticated")
+
+
+def require_page(request: Request, *, auth_password: str, auth_repo: AuthRepository) -> None:
+    """For HTML page endpoints: redirect to /login when unauthenticated."""
+    if not auth_password:
+        return
+    token = request.cookies.get("tgs3_session")
+    user = auth_repo.get_session_user(token) if token else None
+    if user is None:
+        raise RedirectRequest("/login")
+
+
+def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None, *, auth_password: str = "", auth_username: str = "admin", auth_repository: AuthRepository | None = None, session_ttl_days: int = 30, secure_cookie: bool = True) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     renderer = preview_renderer or PreviewRenderer(Path(".data") / "previews")
     templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
     templates.env.filters["format_bytes"] = format_bytes
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
+    auth = auth_repository or AuthRepository(service._repository._connection)
+    if auth_password:
+        auth.upsert_user(username=auth_username, password_hash=hash_password(auth_password))
+
+    @app.exception_handler(RedirectRequest)
+    async def _redirect_handler(_request: Request, exc: RedirectRequest):
+        return RedirectResponse(exc.location, status_code=303)
+
+    def require_auth_route(request: Request) -> None:
+        require_auth(request, auth_password=auth_password, auth_repo=auth)
+
+    def require_page_route(request: Request) -> None:
+        require_page(request, auth_password=auth_password, auth_repo=auth)
+
+    @app.get("/login", response_class=HTMLResponse)
+    def login_page(request: Request):
+        if not auth_password:
+            return RedirectResponse("/", status_code=303)
+        return templates.TemplateResponse(request, "login.html", {"error": None, "next": request.query_params.get("next", "/")})
+
+    @app.post("/login")
+    async def login_submit(request: Request):
+        form = await request.form()
+        username = form.get("username", "")
+        password = form.get("password", "")
+        next_url = form.get("next", "/")
+        if not auth_password:
+            return RedirectResponse(next_url or "/", status_code=303)
+        stored_hash = auth.get_user_hash(auth_username)
+        if username == auth_username and stored_hash and verify_password(password, stored_hash):
+            token = auth.create_session(username=auth_username, ttl=timedelta(days=session_ttl_days))
+            response = RedirectResponse(next_url or "/", status_code=303)
+            response.set_cookie("tgs3_session", token, httponly=True, samesite="lax", secure=secure_cookie, max_age=session_ttl_days * 86400)
+            return response
+        return templates.TemplateResponse(request, "login.html", {"error": "Invalid username or password", "next": next_url}, status_code=401)
+
+    @app.post("/logout")
+    def logout(request: Request):
+        token = request.cookies.get("tgs3_session")
+        if token:
+            auth.delete_session(token)
+        response = RedirectResponse("/login", status_code=303)
+        response.delete_cookie("tgs3_session")
+        return response
+
     @app.get("/", response_class=HTMLResponse)
     def index(request: Request, folder_id: int | None = None):
+        require_page_route(request)
         files = service.list_files(folder_id=folder_id)
         folders = service.list_folders()
         breadcrumb = service.get_breadcrumb(folder_id) if folder_id is not None else []
@@ -88,6 +161,7 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
 
     @app.get("/view/files/{file_id}", response_class=HTMLResponse)
     def detail_page(request: Request, file_id: int):
+        require_page_route(request)
         stored = service.get_file(file_id)
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")
@@ -98,7 +172,8 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         )
 
     @app.post("/files/upload", status_code=201)
-    async def upload(file: UploadFile = File(...), folder_id: int | None = None):
+    async def upload(request: Request, file: UploadFile = File(...), folder_id: int | None = None):
+        require_auth_route(request)
         stored = await service.upload_bytes(
             filename=file.filename or "upload.bin",
             content=await file.read(),
@@ -108,19 +183,23 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return JSONResponse(serialize_file(stored), status_code=201)
 
     @app.get("/files")
-    def list_files(folder_id: int | None = None):
+    def list_files(request: Request, folder_id: int | None = None):
+        require_auth_route(request)
         return [serialize_file(item) for item in service.list_files(folder_id=folder_id)]
 
     @app.get("/files/search")
-    def search_files(q: str = Query("")):
+    def search_files(request: Request, q: str = Query("")):
+        require_auth_route(request)
         return [serialize_file(item) for item in service.search_files(q)]
 
     @app.get("/folders")
-    def folder_tree():
+    def folder_tree(request: Request):
+        require_auth_route(request)
         return build_folder_tree(service.list_folders())
 
     @app.post("/folders", status_code=201)
-    def create_folder(payload: dict):
+    def create_folder(request: Request, payload: dict):
+        require_auth_route(request)
         try:
             folder = service.create_folder(name=payload.get("name"), parent_id=payload.get("parent_id"))
         except ValueError as exc:
@@ -128,7 +207,8 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return JSONResponse(serialize_folder(folder), status_code=201)
 
     @app.patch("/folders/{folder_id}")
-    def rename_folder(folder_id: int, payload: dict):
+    def rename_folder(request: Request, folder_id: int, payload: dict):
+        require_auth_route(request)
         if service.get_folder(folder_id) is None:
             raise HTTPException(status_code=404, detail=f"folder {folder_id} not found")
         try:
@@ -138,7 +218,8 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return serialize_folder(folder)
 
     @app.delete("/folders/{folder_id}", status_code=204)
-    def delete_folder(folder_id: int):
+    def delete_folder(request: Request, folder_id: int):
+        require_auth_route(request)
         try:
             service.delete_folder(folder_id)
         except ValueError as exc:
@@ -146,7 +227,8 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return Response(status_code=204)
 
     @app.post("/files/{file_id}/move")
-    def move_file(file_id: int, payload: dict):
+    def move_file(request: Request, file_id: int, payload: dict):
+        require_auth_route(request)
         try:
             stored = service.move_file(file_id=file_id, folder_id=payload.get("folder_id"))
         except ValueError as exc:
@@ -154,14 +236,16 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return serialize_file(stored)
 
     @app.get("/files/{file_id}")
-    def file_detail(file_id: int):
+    def file_detail(request: Request, file_id: int):
+        require_auth_route(request)
         stored = service.get_file(file_id)
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")
         return serialize_file(stored)
 
     @app.get("/files/{file_id}/download")
-    async def download_file(file_id: int):
+    async def download_file(request: Request, file_id: int):
+        require_auth_route(request)
         downloaded = await service.download_file(file_id)
         return Response(
             content=downloaded.content,
@@ -170,7 +254,8 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         )
 
     @app.get("/files/{file_id}/preview")
-    async def preview_file(file_id: int):
+    async def preview_file(request: Request, file_id: int):
+        require_auth_route(request)
         stored = service.get_file(file_id)
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")

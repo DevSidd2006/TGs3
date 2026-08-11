@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="login-app">
+  <form method="post" action="/login" class="login-card">
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="login-brand">
+      <span class="drive-title">TGS3</span>
+    </div>
+    <h1>Sign in</h1>
+    {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
+    <input class="login-input" type="text" name="username" placeholder="Username" autocomplete="username" required>
+    <input class="login-input" type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+    <button class="login-submit" type="submit">Sign in</button>
+  </form>
+</div>
+{% endblock %}

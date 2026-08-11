@@ -13,8 +13,11 @@ services:
         sync: false
       - key: TGS3_PASSWORD
         sync: false
+      - key: TELEGRAM_SESSION_STRING
+        sync: false
       - key: DATABASE_PATH
         value: "/app/.data/files.db"
+
       - key: TELEGRAM_SESSION
         value: "/app/.data/telegram.session"
 

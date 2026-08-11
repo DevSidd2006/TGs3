@@ -38,4 +38,23 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     file_columns = {row["name"] for row in connection.execute("PRAGMA table_info(files)")}
     if "folder_id" not in file_columns:
         connection.execute("ALTER TABLE files ADD COLUMN folder_id INTEGER REFERENCES folders(id)")
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT NOT NULL UNIQUE,
+            password_hash TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            username TEXT NOT NULL REFERENCES users(username),
+            expires_at TEXT NOT NULL
+        )
+        """
+    )
     connection.commit()

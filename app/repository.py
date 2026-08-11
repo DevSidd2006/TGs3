@@ -1,4 +1,5 @@
-from datetime import datetime
+import secrets
+from datetime import datetime, timedelta
 import sqlite3
 
 from app.models import Folder, StoredFile
@@ -146,3 +147,56 @@ class FileRepository:
             uploaded_at=datetime.fromisoformat(row["uploaded_at"]),
             folder_id=row["folder_id"],
         )
+
+
+class AuthRepository:
+    def __init__(self, connection: sqlite3.Connection) -> None:
+        self._connection = connection
+
+    def upsert_user(self, *, username: str, password_hash: str) -> None:
+        self._connection.execute(
+            """
+            INSERT INTO users (username, password_hash) VALUES (?, ?)
+            ON CONFLICT(username) DO UPDATE SET password_hash = excluded.password_hash
+            """,
+            (username, password_hash),
+        )
+        self._connection.commit()
+
+    def verify_user(self, username: str, password_hash: str) -> bool:
+        row = self._connection.execute(
+            "SELECT password_hash FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        return row is not None and row["password_hash"] == password_hash
+
+    def get_user_hash(self, username: str) -> str | None:
+        row = self._connection.execute(
+            "SELECT password_hash FROM users WHERE username = ?", (username,)
+        ).fetchone()
+        return None if row is None else row["password_hash"]
+
+    def create_session(self, *, username: str, ttl: timedelta) -> str:
+        token = secrets.token_urlsafe(32)
+        expires = (datetime.utcnow() + ttl).isoformat()
+        self._connection.execute(
+            "INSERT INTO sessions (token, username, expires_at) VALUES (?, ?, ?)",
+            (token, username, expires),
+        )
+        self._connection.commit()
+        return token
+
+    def get_session_user(self, token: str) -> str | None:
+        row = self._connection.execute(
+            "SELECT username, expires_at FROM sessions WHERE token = ?", (token,)
+        ).fetchone()
+        if row is None:
+            return None
+        expires = datetime.fromisoformat(row["expires_at"])
+        if expires <= datetime.utcnow():
+            self.delete_session(token)
+            return None
+        return row["username"]
+
+    def delete_session(self, token: str) -> None:
+        self._connection.execute("DELETE FROM sessions WHERE token = ?", (token,))
+        self._connection.commit()

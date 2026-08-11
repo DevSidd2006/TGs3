@@ -20,7 +20,9 @@ class Settings:
     tgs3_user: str = "admin"
     tgs3_password: str = ""
     session_ttl_days: int = 30
-    secure_cookie: bool = True
+    sync_cooldown_seconds: int = 60
+    secure_cookie: bool = False
+
 
 
 def load_settings() -> Settings:
@@ -35,5 +37,7 @@ def load_settings() -> Settings:
         tgs3_user=os.environ.get("TGS3_USER", "admin"),
         tgs3_password=os.environ.get("TGS3_PASSWORD", ""),
         session_ttl_days=int(os.environ.get("TGS3_SESSION_TTL_DAYS", "30")),
-        secure_cookie=os.environ.get("TGS3_SECURE_COOKIE", "1") == "1",
+        sync_cooldown_seconds=int(os.environ.get("TGS3_SYNC_COOLDOWN_SECONDS", "60")),
+        secure_cookie=os.environ.get("TGS3_SECURE_COOKIE", "0") == "1",
     )
+

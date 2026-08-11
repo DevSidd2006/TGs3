@@ -148,3 +148,10 @@ def test_sync_endpoint_returns_count(app_client: TestClient):
     assert response.status_code == 200
     assert response.json() == {"synced_count": 1}
 
+
+def test_sync_endpoint_rate_limited(app_client: TestClient):
+    first = app_client.post("/sync")
+    assert first.status_code == 200
+    second = app_client.post("/sync")
+    assert second.status_code == 429
+

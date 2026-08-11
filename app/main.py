@@ -1,4 +1,5 @@
 import os
+import time
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -90,7 +91,7 @@ def require_page(request: Request, *, auth_password: str, auth_repo: AuthReposit
         raise RedirectRequest("/login")
 
 
-def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None, *, auth_password: str = "", auth_username: str = "admin", auth_repository: AuthRepository | None = None, session_ttl_days: int = 30, secure_cookie: bool = True) -> FastAPI:
+def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None, *, auth_password: str = "", auth_username: str = "admin", auth_repository: AuthRepository | None = None, session_ttl_days: int = 30, secure_cookie: bool = True, sync_cooldown_seconds: int = 60) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     renderer = preview_renderer or PreviewRenderer(Path(".data") / "previews")
     templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -100,6 +101,8 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     auth = auth_repository or AuthRepository(service._repository._connection)
     if auth_password:
         auth.upsert_user(username=auth_username, password_hash=hash_password(auth_password))
+
+    last_sync_at: float | None = None
 
     @app.exception_handler(RedirectRequest)
     async def _redirect_handler(_request: Request, exc: RedirectRequest):
@@ -277,8 +280,14 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
 
     @app.post("/sync")
     async def sync_channel(request: Request):
+        nonlocal last_sync_at
         require_auth_route(request)
+        now = time.monotonic()
+        if sync_cooldown_seconds > 0 and last_sync_at is not None and now - last_sync_at < sync_cooldown_seconds:
+            retry_after = int(sync_cooldown_seconds - (now - last_sync_at)) + 1
+            raise HTTPException(status_code=429, detail=f"sync in progress or too recent; retry after {retry_after}s")
         count = await service.sync_from_channel()
+        last_sync_at = time.monotonic()
         return {"synced_count": count}
 
 
@@ -366,4 +375,5 @@ def create_app(telegram_storage: TelegramStorage | None = None) -> FastAPI:
         auth_username=settings.tgs3_user,
         session_ttl_days=settings.session_ttl_days,
         secure_cookie=settings.secure_cookie,
+        sync_cooldown_seconds=settings.sync_cooldown_seconds,
     )

@@ -2,14 +2,15 @@
 
 Usage: .venv/bin/python scripts/make_session_string.py
 
-Creates .data/telegram.session, logs in once (you enter phone + code),
-then prints a session string to copy into .env / Render env vars.
+Optional: set TGS3_TELEGRAM_PHONE in the environment to skip the phone prompt
+(you will still need to enter the login code sent to your phone).
+
+Prints a session string to copy into .env / Render env vars.
 
 Note: use a SEPARATE session string for each instance (local vs deployed).
 Two instances sharing one session key will trigger AuthKeyDuplicatedError.
 """
 import os
-from pathlib import Path
 
 from dotenv import load_dotenv
 from telethon import TelegramClient
@@ -19,12 +20,10 @@ load_dotenv()
 
 api_id = int(os.environ["TELEGRAM_API_ID"])
 api_hash = os.environ["TELEGRAM_API_HASH"]
-session_path = Path(os.environ.get("TELEGRAM_SESSION", ".data/telegram.session"))
-
-session_path.parent.mkdir(parents=True, exist_ok=True)
+phone = os.environ.get("TGS3_TELEGRAM_PHONE")
 
 client = TelegramClient(StringSession(), api_id, api_hash)
-client.start()
+client.start(phone=phone)
 print("\n=== TELEGRAM_SESSION_STRING ===")
 print(client.session.save())
 print("================================\n")

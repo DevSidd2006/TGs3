@@ -9,6 +9,7 @@ def test_load_settings_reads_environment(monkeypatch, tmp_path: Path):
     monkeypatch.setenv("TELEGRAM_CHANNEL_ID", "-100987654321")
     monkeypatch.setenv("TELEGRAM_SESSION", str(tmp_path / "telegram.session"))
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "files.db"))
+    monkeypatch.setenv("TGS3_PASSWORD", "")
 
     settings = load_settings()
 

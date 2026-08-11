@@ -322,6 +322,26 @@ document.addEventListener("DOMContentLoaded", () => {
   // Theme toggle
   document.getElementById("m-theme-btn")?.addEventListener("click", toggleTheme);
 
+  // Sync from Telegram channel
+  document.getElementById("m-sync-btn")?.addEventListener("click", async () => {
+    const icon = document.getElementById("m-sync-icon");
+    if (icon) icon.classList.add("ph-spin");
+    try {
+      const res = await fetch("/sync", { method: "POST" });
+      if (res.ok) {
+        showToast("Sync complete");
+        await refreshFiles();
+        await loadFolderTree();
+      } else {
+        showToast("Sync failed");
+      }
+    } catch (err) {
+      showToast("Sync error");
+    } finally {
+      if (icon) icon.classList.remove("ph-spin");
+    }
+  });
+
   // FAB & Create modal
   document.getElementById("m-fab-btn")?.addEventListener("click", openCreateModal);
   document.getElementById("m-create-close")?.addEventListener("click", closeCreateModal);

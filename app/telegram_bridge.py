@@ -49,3 +49,20 @@ class TelethonStorage:
         if content is None:
             raise FileNotFoundError(f"Telegram content empty for message {message_id}")
         return DownloadedTelegramFile(filename=filename, content=content, mime_type=mime_type)
+
+    async def list_channel_files(self, *, channel_id: int) -> list[dict]:
+        files: list[dict] = []
+        async for message in self._client.iter_messages(channel_id):
+            if message.file is None:
+                continue
+            files.append(
+                {
+                    "telegram_channel_id": channel_id,
+                    "telegram_message_id": message.id,
+                    "telegram_file_id": str(message.file.id),
+                    "name": message.file.name or message.message or f"file_{message.id}",
+                    "size_bytes": message.file.size,
+                    "mime_type": message.file.mime_type,
+                }
+            )
+        return files

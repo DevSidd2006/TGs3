@@ -1,6 +1,7 @@
 let allFilesCache = [];
 let currentCategory = 'all';
-let currentSort = 'date-desc';
+let currentSort = 'name-asc';
+let viewMode = 'list'; // 'list' or 'grid'
 let currentFolderId = null;
 let folderModalMode = null;
 let folderModalParent = null;
@@ -15,178 +16,174 @@ function formatBytes(bytes, decimals = 1) {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
 }
 
-function getFileBadgeDetails(mimeType) {
-  if (!mimeType) return { class: 'icon-doc', icon: 'ph-file-text', label: 'FILE' };
-  const mime = mimeType.toLowerCase();
-  if (mime.includes('pdf')) return { class: 'icon-pdf', icon: 'ph-file-pdf', label: 'PDF' };
-  if (mime.startsWith('image/')) return { class: 'icon-img', icon: 'ph-image', label: 'IMAGE' };
-  if (mime.startsWith('video/')) return { class: 'icon-video', icon: 'ph-video-camera', label: 'VIDEO' };
-  if (mime.includes('zip') || mime.includes('compressed')) return { class: 'icon-zip', icon: 'ph-file-zip', label: 'ZIP' };
-  return { class: 'icon-doc', icon: 'ph-file-text', label: mime.split('/')[1]?.toUpperCase() || 'FILE' };
+function getDriveBadgeDetails(mimeType, filename = '') {
+  const mime = (mimeType || '').toLowerCase();
+  const name = filename.toLowerCase();
+
+  if (mime.includes('spreadsheet') || name.endsWith('.xlsx') || name.endsWith('.csv')) {
+    return { class: 'icon-sheet', icon: 'ph-file-xls' };
+  }
+  if (mime.includes('ipynb') || name.endsWith('.py') || name.endsWith('.ipynb')) {
+    return { class: 'icon-code', icon: 'ph-code-simple' };
+  }
+  if (mime.includes('pdf') || name.endsWith('.pdf')) {
+    return { class: 'icon-pdf', icon: 'ph-file-pdf' };
+  }
+  if (mime.startsWith('image/') || name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')) {
+    return { class: 'icon-img', icon: 'ph-image' };
+  }
+  if (mime.startsWith('video/') || name.endsWith('.mp4')) {
+    return { class: 'icon-video', icon: 'ph-video-camera' };
+  }
+  if (mime.includes('zip') || name.endsWith('.zip')) {
+    return { class: 'icon-zip', icon: 'ph-file-zip' };
+  }
+  return { class: 'icon-doc', icon: 'ph-file-text' };
 }
 
-function getFileCategory(mimeType) {
-  if (!mimeType) return 'other';
-  const mime = mimeType.toLowerCase();
-  if (mime.includes('pdf')) return 'pdf';
-  if (mime.startsWith('image/')) return 'image';
-  if (mime.startsWith('video/')) return 'video';
-  return 'other';
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function updateCategoryCounts(files) {
-  const counts = { all: files.length, pdf: 0, image: 0, video: 0, other: 0 };
-  files.forEach(f => {
-    const cat = getFileCategory(f.mime_type);
-    counts[cat] = (counts[cat] || 0) + 1;
-  });
+function setViewMode(mode) {
+  viewMode = mode;
+  const listBtn = document.getElementById('btn-view-list');
+  const gridBtn = document.getElementById('btn-view-grid');
+  const container = document.getElementById('files-view-container');
 
-  Object.keys(counts).forEach(cat => {
-    const countEl = document.getElementById(`count-${cat}`);
-    if (countEl) countEl.textContent = counts[cat];
-  });
+  if (listBtn && gridBtn && container) {
+    if (mode === 'list') {
+      listBtn.classList.add('active');
+      gridBtn.classList.remove('active');
+      container.className = 'files-container list-view';
+    } else {
+      gridBtn.classList.add('active');
+      listBtn.classList.remove('active');
+      container.className = 'files-container grid-view';
+    }
+  }
+  renderFileList();
 }
 
 function filterCategory(cat) {
   currentCategory = cat;
-
-  // Update nav bar active state
-  document.querySelectorAll('.sidebar .nav-item').forEach(item => {
+  document.querySelectorAll('.sidebar-nav .nav-item').forEach(item => {
     item.classList.toggle('active', item.dataset.category === cat);
   });
 
-  // Update top tabs active state
-  document.querySelectorAll('.cat-tab').forEach(tab => {
-    tab.classList.toggle('active', tab.dataset.cat === cat);
-  });
-
-  // Update breadcrumb label
-  const breadcrumbEl = document.getElementById('category-breadcrumb');
-  if (breadcrumbEl) {
-    const labels = {
-      all: 'All Files',
-      pdf: 'PDF Documents',
-      image: 'Images & Photos',
-      video: 'Videos & Movies',
-      other: 'Other Documents'
-    };
-    breadcrumbEl.innerHTML = `&rsaquo; ${labels[cat] || 'Files'}`;
+  const heading = document.getElementById('page-heading');
+  if (heading) {
+    heading.textContent = 'Welcome to TGS3';
   }
 
-  renderFileList();
-}
-
-function handleSortChange(sortValue) {
-  currentSort = sortValue;
   renderFileList();
 }
 
 function toggleSort(field) {
-  const sortSelect = document.getElementById('sort-select');
-  if (!sortSelect) return;
-
   if (field === 'name') {
     currentSort = currentSort === 'name-asc' ? 'name-desc' : 'name-asc';
-  } else if (field === 'size') {
-    currentSort = currentSort === 'size-desc' ? 'size-asc' : 'size-desc';
   } else if (field === 'date') {
     currentSort = currentSort === 'date-desc' ? 'date-asc' : 'date-desc';
   }
-
-  sortSelect.value = currentSort;
   renderFileList();
 }
 
 function sortFiles(files) {
   return [...files].sort((a, b) => {
-    switch (currentSort) {
-      case 'name-asc':
-        return a.name.localeCompare(b.name);
-      case 'name-desc':
-        return b.name.localeCompare(a.name);
-      case 'size-asc':
-        return a.size_bytes - b.size_bytes;
-      case 'size-desc':
-        return b.size_bytes - a.size_bytes;
-      case 'date-asc':
-        return new Date(a.uploaded_at || 0) - new Date(b.uploaded_at || 0);
-      case 'date-desc':
-      default:
-        return new Date(b.uploaded_at || 0) - new Date(a.uploaded_at || 0);
-    }
+    if (currentSort === 'name-asc') return a.name.localeCompare(b.name);
+    if (currentSort === 'name-desc') return b.name.localeCompare(a.name);
+    return 0;
   });
 }
 
 function renderFileList() {
-  const tbody = document.getElementById("file-table-body");
-  const countEl = document.getElementById("storage-active-count");
-  if (!tbody) return;
+  const container = document.getElementById('files-view-container');
+  if (!container) return;
 
-  // Filter by category
-  let filtered = allFilesCache;
-  if (currentCategory !== 'all') {
-    filtered = allFilesCache.filter(f => getFileCategory(f.mime_type) === currentCategory);
-  }
+  let displayFiles = [...allFilesCache];
 
-  // Filter by search query if any
   const searchInput = document.getElementById("search-input");
   if (searchInput && searchInput.value.trim()) {
     const q = searchInput.value.trim().toLowerCase();
-    filtered = filtered.filter(f => f.name.toLowerCase().includes(q) || (f.mime_type && f.mime_type.toLowerCase().includes(q)));
+    displayFiles = displayFiles.filter(f => f.name.toLowerCase().includes(q));
   }
 
-  // Apply sorting
-  filtered = sortFiles(filtered);
+  displayFiles = sortFiles(displayFiles);
 
-  if (countEl) {
-    countEl.textContent = `${filtered.length} files`;
-  }
+  if (viewMode === 'list') {
+    let rowsHtml = displayFiles.map(file => {
+      const badge = getDriveBadgeDetails(file.mime_type, file.name);
 
-  if (filtered.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
-          No files found in this section.
-        </td>
-      </tr>
-    `;
-    return;
-  }
-
-  tbody.innerHTML = filtered.map((file) => {
-    const badge = getFileBadgeDetails(file.mime_type);
-    const formattedSize = formatBytes(file.size_bytes);
-    const dateStr = file.uploaded_at ? file.uploaded_at.substring(0, 10) : "Today";
-    const statusLabel = file.status === 'ready' ? 'Synced' : file.status;
-
-    return `
-      <tr>
-        <td>
-          <div class="file-title-wrapper">
-            <div class="file-badge-icon ${badge.class}">
-              <i class="ph-bold ${badge.icon}"></i>
+      return `
+        <tr>
+          <td>
+            <div class="file-cell">
+              <div class="file-type-icon ${badge.class}">
+                <i class="ph-fill ${badge.icon}"></i>
+              </div>
+              <a href="/view/files/${file.id}" class="file-title-link" title="${file.name}">${file.name}</a>
             </div>
-            <a href="/view/files/${file.id}" class="file-name-text">${file.name}</a>
-          </div>
-        </td>
-        <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted);">${badge.label}</span></td>
-        <td><span style="color: var(--text-muted); font-size: 12px;">${dateStr}</span></td>
-        <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px;">${formattedSize}</span></td>
-        <td>
-          <span class="pill-status pill-${file.status}">
-            ${statusLabel}
-          </span>
-        </td>
-        <td>
-          <div class="table-actions">
-            <button type="button" class="link-action preview-trigger" data-id="${file.id}" data-mime="${file.mime_type || ''}" data-name="${file.name}" style="cursor: pointer; background: none; border: none;">Preview</button>
-            <button type="button" class="link-action move-trigger" data-id="${file.id}" style="cursor: pointer; background: none; border: none;">Move</button>
-            <a href="/files/${file.id}/download" class="link-action">Download</a>
-          </div>
-        </td>
-      </tr>
+          </td>
+          <td><span class="file-size-text">${formatBytes(file.size_bytes)}</span></td>
+          <td><span class="file-modified-text">${formatDate(file.uploaded_at)}</span></td>
+          <td style="text-align: right;">
+            <button class="action-menu-btn preview-trigger" data-id="${file.id}" data-mime="${file.mime_type || ''}" data-name="${file.name}" title="Preview">
+              <i class="ph-bold ph-eye"></i>
+            </button>
+            <button class="action-menu-btn move-trigger" data-id="${file.id}" title="Move">
+              <i class="ph-bold ph-folder-notch"></i>
+            </button>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    container.innerHTML = `
+      <table class="drive-file-table">
+        <thead>
+          <tr>
+            <th class="col-name" onclick="toggleSort('name')">Name <i class="ph-bold ph-caret-down"></i></th>
+            <th class="col-size">Size</th>
+            <th class="col-modified">Modified</th>
+            <th class="col-actions"></th>
+          </tr>
+        </thead>
+        <tbody id="file-table-body">
+          ${rowsHtml || '<tr><td colspan="4" style="text-align: center; padding: 40px; color: #5f6368;">No files found</td></tr>'}
+        </tbody>
+      </table>
     `;
-  }).join("");
+  } else {
+    // Grid View
+    let gridCardsHtml = displayFiles.map(file => {
+      const badge = getDriveBadgeDetails(file.mime_type, file.name);
+
+      return `
+        <div class="grid-file-card" onclick="location.href='/view/files/${file.id}'">
+          <div class="grid-file-header">
+            <div class="file-type-icon ${badge.class}">
+              <i class="ph-fill ${badge.icon}"></i>
+            </div>
+            <button class="action-menu-btn preview-trigger" data-id="${file.id}" data-mime="${file.mime_type || ''}" data-name="${file.name}" onclick="event.stopPropagation();">
+              <i class="ph-bold ph-dots-three-vertical"></i>
+            </button>
+          </div>
+          <div class="grid-file-title" title="${file.name}">${file.name}</div>
+          <div class="grid-file-preview-box">
+            <i class="ph-fill ${badge.icon}" style="color: rgba(60,64,67,0.3)"></i>
+          </div>
+          <div class="grid-file-footer">
+            <span>${formatBytes(file.size_bytes)}</span>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    container.innerHTML = gridCardsHtml || '<div style="padding: 40px; color: #5f6368;">No files found</div>';
+  }
 }
 
 async function refreshFiles(query = "") {
@@ -196,7 +193,6 @@ async function refreshFiles(query = "") {
       : `/files?folder_id=${currentFolderId || ""}`;
     const response = await fetch(url);
     allFilesCache = await response.json();
-    updateCategoryCounts(allFilesCache);
     renderFileList();
   } catch (err) {
     console.error("Error refreshing file list:", err);
@@ -223,13 +219,6 @@ async function uploadFile(file) {
   }
 }
 
-const PREVIEW_BODY = {
-  image: (src) => `<img class="preview-image" src="${src}" alt="Preview">`,
-  video: (src, mime) => `<video class="preview-frame" controls autoplay src="${src}" type="${mime}"></video>`,
-  embed: (src) => `<iframe class="preview-frame" src="${src}" title="Preview"></iframe>`,
-  missing: (name) => `<div class="preview-missing"><i class="ph-bold ph-file-x"></i><p>No preview available for <strong>${name}</strong>.</p><a class="link-action" href="#" data-download>Download instead</a></div>`,
-};
-
 function openPreview(fileId, fileName, mimeType) {
   const overlay = document.getElementById("preview-overlay");
   const body = document.getElementById("preview-body");
@@ -241,21 +230,12 @@ function openPreview(fileId, fileName, mimeType) {
   download.href = `/files/${fileId}/download`;
 
   if (mimeType && mimeType.startsWith("image/")) {
-    body.innerHTML = PREVIEW_BODY.image(src);
-  } else if (mimeType && mimeType.startsWith("video/")) {
-    body.innerHTML = PREVIEW_BODY.video(src, mimeType);
-  } else if (mimeType === "application/pdf" || (mimeType && mimeType.includes("pdf"))) {
-    body.innerHTML = PREVIEW_BODY.embed(src);
+    body.innerHTML = `<img class="preview-image" src="${src}" alt="Preview">`;
   } else {
-    body.innerHTML = PREVIEW_BODY.embed(src);
+    body.innerHTML = `<iframe class="preview-frame" src="${src}" title="Preview"></iframe>`;
   }
 
-  body.querySelectorAll("[data-download]").forEach((link) => {
-    link.href = download.href;
-  });
-
   overlay.hidden = false;
-  document.body.classList.add("preview-open");
 }
 
 function closePreview() {
@@ -263,7 +243,6 @@ function closePreview() {
   if (!overlay || overlay.hidden) return;
   overlay.hidden = true;
   document.getElementById("preview-body").innerHTML = "";
-  document.body.classList.remove("preview-open");
 }
 
 function buildTreeHtml(nodes, depth = 0) {
@@ -271,10 +250,10 @@ function buildTreeHtml(nodes, depth = 0) {
     <div class="tree-node" style="--depth: ${depth}">
       <div class="tree-row">
         <button type="button" class="tree-folder" data-nav="${node.id}" title="${node.name}">
-          <i class="ph-bold ph-folder"></i>
+          <i class="ph-fill ph-folder" style="color: #1a73e8;"></i>
           <span>${node.name}</span>
         </button>
-        <button type="button" class="icon-action-btn tree-menu" data-menu="${node.id}" title="Options">
+        <button type="button" class="tree-menu" data-menu="${node.id}" title="Options">
           <i class="ph-bold ph-dots-three-vertical"></i>
         </button>
       </div>
@@ -298,42 +277,6 @@ async function loadFolderTree() {
 function navigate(folderId) {
   const url = folderId ? `/?folder_id=${folderId}` : "/";
   window.location.href = url;
-}
-
-function openFolderModal(mode, parentId) {
-  folderModalMode = mode;
-  folderModalParent = parentId ?? null;
-  document.getElementById("folder-modal-title").textContent = mode === "create" ? "New Folder" : "Rename Folder";
-  document.getElementById("folder-modal-name").value = "";
-  document.getElementById("folder-modal").hidden = false;
-  document.getElementById("folder-modal-name").focus();
-}
-
-function closeFolderModal() {
-  document.getElementById("folder-modal").hidden = true;
-  folderModalMode = null;
-  folderModalParent = null;
-}
-
-async function saveFolder() {
-  const name = document.getElementById("folder-modal-name").value.trim();
-  if (!name) return;
-  const mode = folderModalMode;
-  const body = mode === "rename" ? { name } : { name, parent_id: folderModalParent };
-  const url = mode === "rename" ? `/folders/${folderModalParent}` : "/folders";
-  const res = await fetch(url, {
-    method: mode === "rename" ? "PATCH" : "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (res.ok) {
-    closeFolderModal();
-    await loadFolderTree();
-    window.location.reload();
-  } else {
-    const err = await res.json();
-    alert(err.detail || "Failed to save folder.");
-  }
 }
 
 function folderOptionsHtml() {
@@ -377,18 +320,111 @@ async function saveMove() {
   }
 }
 
+function openFolderModal(mode, parentId) {
+  folderModalMode = mode;
+  folderModalParent = parentId ?? null;
+  document.getElementById("folder-modal-title").textContent = mode === "create" ? "New folder" : "Rename folder";
+  document.getElementById("folder-modal-name").value = "";
+  document.getElementById("folder-modal").hidden = false;
+  document.getElementById("folder-modal-name").focus();
+}
+
+function closeFolderModal() {
+  document.getElementById("folder-modal").hidden = true;
+  folderModalMode = null;
+  folderModalParent = null;
+}
+
+async function saveFolder() {
+  const name = document.getElementById("folder-modal-name").value.trim();
+  if (!name) return;
+  const mode = folderModalMode;
+  const body = mode === "rename" ? { name } : { name, parent_id: folderModalParent };
+  const url = mode === "rename" ? `/folders/${folderModalParent}` : "/folders";
+  const res = await fetch(url, {
+    method: mode === "rename" ? "PATCH" : "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (res.ok) {
+    closeFolderModal();
+    await loadFolderTree();
+    window.location.reload();
+  } else {
+    const err = await res.json();
+    alert(err.detail || "Failed to save folder.");
+  }
+}
+
+function folderActionMenu(folderId, folderName) {
+  const action = window.prompt(`Folder options for "${folderName}": type 'new' for subfolder, 'rename', or 'delete'`);
+  if (action === "new") openFolderModal("create", folderId);
+  else if (action === "rename") openFolderModal("rename", folderId);
+  else if (action === "delete") {
+    if (window.confirm(`Delete folder "${folderName}"? Only empty folders can be deleted.`)) {
+      fetch(`/folders/${folderId}`, { method: "DELETE" }).then((res) => {
+        if (res.status === 204) { loadFolderTree(); window.location.reload(); }
+        else if (res.status === 409) alert("Folder is not empty.");
+      });
+    }
+  }
+}
+
+function initTheme() {
+  const savedTheme = localStorage.getItem('drive_theme') || 'light';
+  applyTheme(savedTheme);
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  localStorage.setItem('drive_theme', theme);
+  const icon = document.getElementById('theme-toggle-icon');
+  const btn = document.getElementById('theme-toggle-btn');
+  if (icon) {
+    if (theme === 'dark') {
+      icon.className = 'ph-bold ph-sun';
+      if (btn) btn.title = 'Switch to Light theme';
+    } else {
+      icon.className = 'ph-bold ph-moon';
+      if (btn) btn.title = 'Switch to Dark theme';
+    }
+  }
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') || 'light';
+  const next = current === 'dark' ? 'light' : 'dark';
+  applyTheme(next);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  initTheme();
+  document.getElementById("theme-toggle-btn")?.addEventListener("click", toggleTheme);
+
   const searchInput = document.getElementById("search-input");
   const fileInputHeader = document.getElementById("file-input-header");
   const fileInputDrop = document.getElementById("file-input-drop");
   const dropZone = document.getElementById("drop-zone");
+  const newBtn = document.getElementById("btn-new-menu-trigger");
+  const newDropdown = document.getElementById("new-dropdown-menu");
 
-  const appFrame = document.querySelector(".app-frame");
+  const appFrame = document.querySelector(".drive-app");
   currentFolderId = appFrame?.dataset.currentFolder ? parseInt(appFrame.dataset.currentFolder, 10) : null;
 
-  // Initial fetch to load files into memory
   refreshFiles();
   loadFolderTree();
+
+  // Toggle + New Menu
+  if (newBtn && newDropdown) {
+    newBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      newDropdown.hidden = !newDropdown.hidden;
+    });
+
+    document.addEventListener("click", () => {
+      newDropdown.hidden = true;
+    });
+  }
 
   searchInput?.addEventListener("input", () => {
     renderFileList();
@@ -396,7 +432,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   fileInputHeader?.addEventListener("change", (e) => {
     if (e.target.files && e.target.files[0]) {
-      uploadFile(e.target.files[0]);
+      Array.from(e.target.files).forEach(file => uploadFile(file));
     }
   });
 
@@ -432,26 +468,20 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  const fileTableBody = document.getElementById("file-table-body");
-  fileTableBody?.addEventListener("click", (e) => {
+  const filesView = document.getElementById("files-view-container");
+  filesView?.addEventListener("click", (e) => {
     const trigger = e.target.closest(".preview-trigger");
     if (trigger) return openPreview(trigger.dataset.id, trigger.dataset.name, trigger.dataset.mime);
     const move = e.target.closest(".move-trigger");
     if (move) return openMoveModal(move.dataset.id);
-    const folderMenu = e.target.closest(".folder-menu-btn");
-    if (folderMenu) {
-      const id = folderMenu.dataset.folderId;
-      const action = window.prompt(`Folder options for "${folderMenu.dataset.folderName}": type 'new' for subfolder, 'rename', or 'delete'`);
-      if (action === "new") openFolderModal("create", id);
-      else if (action === "rename") openFolderModal("rename", id);
-      else if (action === "delete") {
-        if (window.confirm(`Delete folder "${folderMenu.dataset.folderName}"? Only empty folders can be deleted.`)) {
-          fetch(`/folders/${id}`, { method: "DELETE" }).then((res) => {
-            if (res.status === 204) { loadFolderTree(); window.location.reload(); }
-            else if (res.status === 409) alert("Folder is not empty.");
-          });
-        }
-      }
+  });
+
+  const foldersGrid = document.getElementById("folders-grid-container");
+  foldersGrid?.addEventListener("click", (e) => {
+    const menu = e.target.closest(".folder-menu-btn");
+    if (menu) {
+      e.stopPropagation();
+      return folderActionMenu(menu.dataset.folderId, menu.dataset.folderName);
     }
   });
 
@@ -462,26 +492,9 @@ document.addEventListener("DOMContentLoaded", () => {
     const menu = e.target.closest(".tree-menu");
     if (menu) {
       const id = menu.dataset.menu;
-      const action = window.prompt("Folder options: type 'new' for subfolder, 'rename', or 'delete'");
-      if (action === "new") openFolderModal("create", id);
-      else if (action === "rename") openFolderModal("rename", id);
-      else if (action === "delete") {
-        if (window.confirm("Delete this folder? Only empty folders can be deleted.")) {
-          fetch(`/folders/${id}`, { method: "DELETE" }).then((res) => {
-            if (res.status === 204) { loadFolderTree(); window.location.reload(); }
-            else if (res.status === 409) alert("Folder is not empty.");
-          });
-        }
-      }
+      const name = menu.closest(".tree-row")?.querySelector("span")?.textContent || "this folder";
+      folderActionMenu(id, name);
     }
-  });
-
-  document.querySelectorAll("[data-nav]").forEach((el) => {
-    el.addEventListener("click", (e) => {
-      const target = el.dataset.nav;
-      if (target === "root") return navigate(null);
-      if (!isNaN(parseInt(target, 10))) { e.preventDefault(); return navigate(target); }
-    });
   });
 
   document.getElementById("btn-new-folder")?.addEventListener("click", () => openFolderModal("create", currentFolderId));

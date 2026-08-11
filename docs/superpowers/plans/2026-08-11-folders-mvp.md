@@ -2,11 +2,11 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add Google-Drive-style nested folders to TeleVault: create/rename/delete folders, browse via a sidebar tree and breadcrumbs, upload into a chosen folder, and move files between folders.
+**Goal:** Add Google-Drive-style nested folders to TGS3: create/rename/delete folders, browse via a sidebar tree and breadcrumbs, upload into a chosen folder, and move files between folders.
 
 **Architecture:** A new `folders` table uses a self-referencing `parent_id` (NULL = root) for unlimited nesting. Files gain a nullable `folder_id` foreign key. `FileRepository` gains folder methods; `StorageService` delegates them; FastAPI routes expose a folder-tree JSON plus CRUD; the Jinja + vanilla-JS frontend renders the tree in the sidebar, a clickable breadcrumb, folder rows above file rows, an upload destination picker, and a move action.
 
-**Tech Stack:** Python 3.13, FastAPI, Starlette, Jinja2, SQLite (`sqlite3` stdlib), vanilla JS, existing TeleVault dark theme. Tests via pytest with `TestClient`.
+**Tech Stack:** Python 3.13, FastAPI, Starlette, Jinja2, SQLite (`sqlite3` stdlib), vanilla JS, existing TGS3 dark theme. Tests via pytest with `TestClient`.
 
 **Spec:** `docs/superpowers/specs/2026-08-11-folders-design.md`
 

@@ -1,4 +1,4 @@
-# Telegram Storage MVP Implementation Plan
+# TGS3 Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -90,7 +90,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'app'` or `cannot impo
 ```toml
 # pyproject.toml
 [project]
-name = "telegram-storage-mvp"
+name = "tgs3"
 version = "0.1.0"
 requires-python = ">=3.11"
 dependencies = [
@@ -1056,7 +1056,7 @@ app = create_app()
 ```markdown
 # README.md
 
-## Telegram Storage MVP
+## TGS3
 
 ### Local setup
 

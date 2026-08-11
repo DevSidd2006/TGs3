@@ -1,6 +1,6 @@
 # README.md
 
-## Telegram Storage MVP
+## TGS3
 
 ### Local setup
 

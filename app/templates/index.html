@@ -1,251 +1,217 @@
 {% extends "base.html" %}
 {% block body %}
-<div class="app-frame" data-current-folder="{{ current_folder_id or '' }}">
-  <!-- Left Sidebar -->
-  <aside class="sidebar">
-    <div>
-      <a href="/" class="brand">
-        <div class="brand-icon">
-          <i class="ph-bold ph-telegram-logo"></i>
-        </div>
-        <span class="brand-name">TeleVault</span>
+<div class="drive-app" data-current-folder="{{ current_folder_id or '' }}">
+  <!-- Top Drive Header Bar -->
+  <header class="drive-header">
+    <div class="header-left">
+      <a href="/" class="drive-logo">
+        <svg class="google-drive-icon" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
+          <path d="M12 2L3.5 17h5.2L12 10.6 15.3 17h5.2L12 2z" fill="#1a73e8"/>
+          <path d="M12 10.6L8.7 17h6.6L12 10.6z" fill="#0b57d0"/>
+          <path d="M3.5 17l2.6 4.5a3 3 0 002.6 1.5h6.6c1.1 0 2.1-.6 2.6-1.5l2.6-4.5h-5.2L12 19l-3.3-2H3.5z" fill="#66b5f6"/>
+          <path d="M12 2v5.4l3.3 9.6h5.2L12 2z" fill="#4285f4"/>
+        </svg>
+        <span class="drive-title">TGS3</span>
       </a>
+    </div>
 
-      <button class="btn-create-new" onclick="document.getElementById('file-input-header').click()">
-        <i class="ph-bold ph-plus"></i> Upload File
-      </button>
+    <!-- Search Input Bar -->
+    <div class="header-search-container">
+      <div class="search-box">
+        <i class="ph ph-magnifying-glass search-box-icon"></i>
+        <input id="search-input" type="search" class="search-input" placeholder="Search in TGS3" autocomplete="off">
+      </div>
+    </div>
 
-      <ul class="nav-list">
-        <li class="nav-item active" data-category="all">
-          <a href="#" onclick="filterCategory('all'); return false;"><i class="ph-bold ph-house"></i> All Files</a>
-        </li>
-        <li class="nav-item" data-category="pdf">
-          <a href="#" onclick="filterCategory('pdf'); return false;"><i class="ph-bold ph-file-pdf"></i> PDFs</a>
-        </li>
-        <li class="nav-item" data-category="image">
-          <a href="#" onclick="filterCategory('image'); return false;"><i class="ph-bold ph-image"></i> Images</a>
-        </li>
-        <li class="nav-item" data-category="video">
-          <a href="#" onclick="filterCategory('video'); return false;"><i class="ph-bold ph-video-camera"></i> Videos</a>
-        </li>
-        <li class="nav-item" data-category="other">
-          <a href="#" onclick="filterCategory('other'); return false;"><i class="ph-bold ph-files"></i> Others</a>
-        </li>
-      </ul>
+    <!-- Right Header Actions -->
+    <div class="header-right">
+      <button class="icon-btn" id="theme-toggle-btn" title="Toggle theme (Light / Dark)"><i class="ph-bold ph-moon" id="theme-toggle-icon"></i></button>
+    </div>
+  </header>
 
-      <div class="sidebar-folders">
-        <div class="sidebar-folders-header">
-          <span class="sidebar-section-title">Folders</span>
-          <button id="btn-new-folder" class="icon-action-btn" title="New Folder"><i class="ph-bold ph-folder-plus"></i></button>
+  <!-- Drive App Body -->
+  <div class="drive-body">
+    <!-- Left Navigation Sidebar -->
+    <aside class="drive-sidebar">
+      <!-- + New Floating Button -->
+      <div class="new-btn-container">
+        <button class="btn-new" id="btn-new-menu-trigger">
+          <svg class="plus-icon" width="24" height="24" viewBox="0 0 24 24">
+            <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="#1f1f1f"/>
+          </svg>
+          <span>New</span>
+        </button>
+
+        <!-- New Menu Dropdown -->
+        <div class="new-dropdown" id="new-dropdown-menu" hidden>
+          <button type="button" class="dropdown-item" onclick="document.getElementById('file-input-header').click()">
+            <i class="ph-bold ph-file-arrow-up"></i> File upload
+          </button>
+          <button type="button" class="dropdown-item" onclick="openFolderModal('create', currentFolderId)">
+            <i class="ph-bold ph-folder-plus"></i> New folder
+          </button>
+        </div>
+      </div>
+
+      <input id="file-input-header" type="file" style="display: none;" multiple>
+
+      <!-- Sidebar Navigation Menu -->
+      <nav class="sidebar-nav">
+        <ul class="nav-list">
+          <li class="nav-item active" data-category="all">
+            <a href="/" onclick="filterCategory('all'); return false;">
+              <i class="ph-fill ph-house"></i>
+              <span class="nav-label">Home</span>
+            </a>
+          </li>
+        </ul>
+      </nav>
+
+      <!-- Sidebar Folders Tree -->
+      <div class="sidebar-folder-tree-section">
+        <div class="folder-tree-header">
+          <span>Folders</span>
+          <button id="btn-new-folder" class="icon-btn-sm" title="New Folder"><i class="ph-bold ph-folder-plus"></i></button>
         </div>
         <div id="folder-tree" class="folder-tree"></div>
       </div>
-    </div>
+    </aside>
 
-    <!-- User Profile Pill -->
-    <div class="user-profile">
-      <div class="avatar">TG</div>
-      <div class="user-info">
-        <span class="user-name">Telegram Storage</span>
-        <span class="user-role">Cloud Private Channel</span>
-      </div>
-    </div>
-  </aside>
-
-  <!-- Right Main Area -->
-  <div class="main-area">
-    <!-- Top Bar -->
-    <header class="top-bar">
-      <div class="search-input-wrapper">
-        <i class="ph-bold ph-magnifying-glass"></i>
-        <input id="search-input" class="search-input" type="search" placeholder="Search files by name or type...">
-      </div>
-
-      <div class="top-bar-actions">
-        <button class="icon-btn" title="Refresh" onclick="refreshFiles()"><i class="ph-bold ph-arrows-clockwise"></i></button>
-      </div>
-    </header>
-
-    <!-- Main Content Body -->
-    <main class="content-body">
-      <!-- Hero Row: Drag & Drop Card + Storage Analytics Card -->
-      <div class="hero-dashboard-grid">
-        <!-- Drag & Drop Box -->
-        <div id="drop-zone" class="drag-drop-card">
-          <div class="upload-icon-glow">
-            <i class="ph-bold ph-cloud-arrow-up"></i>
-          </div>
-          <div class="upload-title">
-            Drag & Drop files or <label for="file-input-drop">browse</label> to upload
-          </div>
-          <div class="upload-subtitle">Files saved securely to your Telegram private channel</div>
-          <input id="file-input-drop" type="file" multiple>
-        </div>
-
-        <!-- Storage Analytics Box -->
-        <div class="storage-widget-card">
-          <div>
-            <div class="widget-header">
-              <span class="widget-title">Storage Breakdown</span>
-              <span class="widget-subtitle">Unlimited</span>
-            </div>
-            <div class="storage-progress-bar">
-              <div class="storage-progress-fill"></div>
-            </div>
-          </div>
-
-          <div class="storage-breakdown">
-            <div class="breakdown-item">
-              <div class="dot-label"><span class="dot dot-cyan"></span> Total Files</div>
-              <span class="breakdown-value" id="storage-active-count">{{ files|length }} files</span>
-            </div>
-            <div class="breakdown-item">
-              <div class="dot-label"><span class="dot dot-purple"></span> Telegram Sync</div>
-              <span class="breakdown-value">100% Online</span>
-            </div>
-            <div class="breakdown-item">
-              <div class="dot-label"><span class="dot dot-indigo"></span> Security</div>
-              <span class="breakdown-value">Private Channel</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Categories Filter Tabs Bar -->
-      <div class="category-tabs-bar">
-        <button class="cat-tab active" data-cat="all" onclick="filterCategory('all')">
-          <i class="ph-bold ph-squares-four"></i> All (<span id="count-all">{{ files|length }}</span>)
-        </button>
-        <button class="cat-tab" data-cat="pdf" onclick="filterCategory('pdf')">
-          <i class="ph-bold ph-file-pdf"></i> PDFs (<span id="count-pdf">0</span>)
-        </button>
-        <button class="cat-tab" data-cat="image" onclick="filterCategory('image')">
-          <i class="ph-bold ph-image"></i> Images (<span id="count-image">0</span>)
-        </button>
-        <button class="cat-tab" data-cat="video" onclick="filterCategory('video')">
-          <i class="ph-bold ph-video-camera"></i> Videos (<span id="count-video">0</span>)
-        </button>
-        <button class="cat-tab" data-cat="other" onclick="filterCategory('other')">
-          <i class="ph-bold ph-files"></i> Others (<span id="count-other">0</span>)
-        </button>
-      </div>
-
-      <!-- Action & Sorting Controls Bar -->
-      <div class="files-action-bar">
-        <div class="breadcrumb-title" id="breadcrumb">
-          <a href="/" class="crumb-link" data-nav="root">All Files</a>
-          {% for crumb in breadcrumb %}
-            <span class="crumb-sep">&rsaquo;</span>
-            <a href="/?folder_id={{ crumb.id }}" class="crumb-link" data-nav="{{ crumb.id }}">{{ crumb.name }}</a>
-          {% endfor %}
-          <span id="category-breadcrumb"></span>
-        </div>
-
-        <div class="action-buttons-group">
-          <!-- Sorting Select Menu -->
-          <div class="sort-wrapper">
-            <i class="ph-bold ph-sort-ascending"></i>
-            <select id="sort-select" class="sort-select" onchange="handleSortChange(this.value)">
-              <option value="date-desc">Newest First</option>
-              <option value="date-asc">Oldest First</option>
-              <option value="name-asc">Name (A &rarr; Z)</option>
-              <option value="name-desc">Name (Z &rarr; A)</option>
-              <option value="size-desc">Size (Largest)</option>
-              <option value="size-asc">Size (Smallest)</option>
-            </select>
-          </div>
-
-          <label class="btn-secondary" style="cursor: pointer;">
-            <i class="ph-bold ph-upload"></i> Upload
-            <input id="file-input-header" type="file" style="display: none;">
-          </label>
-        </div>
-      </div>
-
-      <!-- File Table Card -->
-      <div class="table-card">
-        <table class="mock-file-table">
-          <thead>
-            <tr>
-              <th style="width: 40%; cursor: pointer;" onclick="toggleSort('name')">Name <i class="ph-bold ph-caret-down"></i></th>
-              <th>Type</th>
-              <th style="cursor: pointer;" onclick="toggleSort('date')">Date <i class="ph-bold ph-caret-down"></i></th>
-              <th style="cursor: pointer;" onclick="toggleSort('size')">Size <i class="ph-bold ph-caret-down"></i></th>
-              <th>Status</th>
-              <th style="text-align: right;">Actions</th>
-            </tr>
-          </thead>
-          <tbody id="file-table-body">
-            {% for folder in subfolders %}
-            <tr class="folder-row" data-folder-row>
-              <td>
-                <div class="file-title-wrapper">
-                  <div class="file-badge-icon icon-folder">
-                    <i class="ph-bold ph-folder"></i>
-                  </div>
-                  <a href="/?folder_id={{ folder.id }}" class="file-name-text" data-nav="{{ folder.id }}">{{ folder.name }}</a>
-                </div>
-              </td>
-              <td colspan="4"><span style="color: var(--text-subtle); font-size: 12px;">Folder</span></td>
-              <td style="text-align: right;">
-                <div class="table-actions">
-                  <button type="button" class="link-action folder-menu-btn" data-folder-id="{{ folder.id }}" data-folder-name="{{ folder.name }}">...</button>
-                </div>
-              </td>
-            </tr>
-            {% endfor %}
-            {% for file in files %}
-            <tr>
-              <td>
-                <div class="file-title-wrapper">
-                  <div class="file-badge-icon {% if 'image' in (file.mime_type or '') %}icon-img{% elif 'pdf' in (file.mime_type or '') %}icon-pdf{% elif 'video' in (file.mime_type or '') %}icon-video{% elif 'zip' in (file.mime_type or '') %}icon-zip{% else %}icon-doc{% endif %}">
-                    <i class="ph-bold {% if 'image' in (file.mime_type or '') %}ph-image{% elif 'pdf' in (file.mime_type or '') %}ph-file-pdf{% elif 'video' in (file.mime_type or '') %}ph-video-camera{% elif 'zip' in (file.mime_type or '') %}ph-file-zip{% else %}ph-file-text{% endif %}"></i>
-                  </div>
-                  <a href="/view/files/{{ file.id }}" class="file-name-text">{{ file.name }}</a>
-                </div>
-              </td>
-              <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px; color: var(--text-muted);">{{ file.mime_type or "DOCUMENT" }}</span></td>
-              <td><span style="color: var(--text-muted); font-size: 12px;">{{ file.uploaded_at[:10] if file.uploaded_at else "Today" }}</span></td>
-              <td><span style="font-family: 'JetBrains Mono', monospace; font-size: 12px;">{{ file.size_bytes }} B</span></td>
-              <td>
-                <span class="pill-status pill-{{ file.status }}">
-                  {% if file.status == 'ready' %}Synced{% else %}{{ file.status }}{% endif %}
-                </span>
-              </td>
-              <td>
-                <div class="table-actions">
-                  <button class="link-action preview-trigger" data-id="{{ file.id }}" data-mime="{{ file.mime_type or '' }}" data-name="{{ file.name }}">Preview</button>
-                  <button class="link-action move-trigger" data-id="{{ file.id }}">Move</button>
-                  <a href="/files/{{ file.id }}/download" class="link-action">Download</a>
-                </div>
-              </td>
-            </tr>
+    <!-- Main Workspace Area -->
+    <main class="drive-main-workspace">
+      <!-- Main Content Header -->
+      <div class="workspace-header">
+        <div class="workspace-title-row">
+          <h1 class="page-heading" id="page-heading">
+            {% if breadcrumb %}
+              {% for crumb in breadcrumb %}
+                {{ crumb.name }}
+              {% endfor %}
             {% else %}
-            <tr>
-              <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">
-                No files uploaded yet. Drag and drop files above to start saving.
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+              Welcome to TGS3
+            {% endif %}
+          </h1>
+        </div>
+
+        <!-- Hidden/Accessible Breadcrumb Data -->
+        <div class="breadcrumb-container" id="breadcrumb" style="font-size: 13px; color: var(--text-secondary); margin-top: 4px;">
+          <a href="/" data-nav="root" style="color: var(--text-secondary); text-decoration: none;">All Files</a>
+          {% for crumb in breadcrumb %}
+            <span style="margin: 0 4px;">&rsaquo;</span>
+            <a href="/?folder_id={{ crumb.id }}" style="color: #0b57d0; text-decoration: none;">{{ crumb.name }}</a>
+          {% endfor %}
+        </div>
       </div>
+
+      <!-- Drop Zone Container (Drag & Drop files) -->
+      <div id="drop-zone" class="drag-drop-banner">
+        <div class="drop-content">
+          <i class="ph-bold ph-cloud-arrow-up"></i>
+          <span>Drag and drop files here to upload to TGS3</span>
+        </div>
+        <input id="file-input-drop" type="file" multiple style="display: none;">
+      </div>
+
+      <!-- Folders Section -->
+      <section class="drive-section" id="folders-section">
+        <div class="section-title-bar">
+          <button class="section-toggle-btn">
+            <i class="ph-bold ph-caret-down"></i>
+            <h2>Folders</h2>
+          </button>
+        </div>
+
+        <div class="folders-grid" id="folders-grid-container">
+          {% for folder in subfolders %}
+          <div class="folder-card" onclick="window.location.href='/?folder_id={{ folder.id }}'">
+            <div class="folder-card-icon">
+              <i class="ph-fill ph-folder" style="color: #1a73e8;"></i>
+            </div>
+            <div class="folder-card-details">
+              <span class="folder-card-name" title="{{ folder.name }}">{{ folder.name }}</span>
+              <span class="folder-card-location">in TGS3</span>
+            </div>
+            <button class="folder-card-menu-btn folder-menu-btn" data-folder-id="{{ folder.id }}" data-folder-name="{{ folder.name }}" type="button" onclick="event.stopPropagation();">
+              <i class="ph-bold ph-dots-three-vertical"></i>
+            </button>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- Files Section -->
+      <section class="drive-section" id="files-section">
+        <div class="section-title-bar file-section-bar">
+          <button class="section-toggle-btn">
+            <i class="ph-bold ph-caret-down"></i>
+            <h2>Files</h2>
+          </button>
+
+          <!-- View Mode & Action Toggle Group -->
+          <div class="view-toggle-pill-group">
+            <button class="toggle-pill-btn active" id="btn-view-list" title="List view" onclick="setViewMode('list')">
+              <i class="ph-bold ph-list-bullets"></i>
+            </button>
+            <button class="toggle-pill-btn" id="btn-view-grid" title="Grid view" onclick="setViewMode('grid')">
+              <i class="ph-bold ph-squares-four"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Files Content Area (List View & Grid View Container) -->
+        <div class="files-container list-view" id="files-view-container">
+          <table class="drive-file-table">
+            <thead>
+              <tr>
+                <th class="col-name" onclick="toggleSort('name')">Name <i class="ph-bold ph-caret-down"></i></th>
+                <th class="col-size">Size</th>
+                <th class="col-modified">Modified</th>
+                <th class="col-actions"></th>
+              </tr>
+            </thead>
+            <tbody id="file-table-body">
+              {% for file in files %}
+              <tr>
+                <td>
+                  <div class="file-cell">
+                    <div class="file-type-icon icon-doc">
+                      <i class="ph-fill ph-file-text"></i>
+                    </div>
+                    <a href="/view/files/{{ file.id }}" class="file-title-link" title="{{ file.name }}">{{ file.name }}</a>
+                  </div>
+                </td>
+                <td><span class="file-size-text">{{ file.size_bytes | format_bytes }}</span></td>
+                <td><span class="file-modified-text">{{ file.uploaded_at[:10] if file.uploaded_at else "" }}</span></td>
+                <td style="text-align: right;">
+                  <button class="action-menu-btn preview-trigger" data-id="{{ file.id }}" data-mime="{{ file.mime_type or '' }}" data-name="{{ file.name }}" title="Preview">
+                    <i class="ph-bold ph-eye"></i>
+                  </button>
+                  <button class="action-menu-btn move-trigger" data-id="{{ file.id }}" title="Move">
+                    <i class="ph-bold ph-folder-notch"></i>
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   </div>
 </div>
 
-<!-- Folder Modal (create/rename) -->
+<!-- Folder Modal (Create/Rename) -->
 <div id="folder-modal" class="preview-overlay" hidden>
   <div class="modal-card">
-    <div class="preview-header">
-      <span id="folder-modal-title" class="preview-name">New Folder</span>
-      <button id="folder-modal-close" class="icon-action-btn" title="Close"><i class="ph-bold ph-x"></i></button>
+    <div class="modal-header">
+      <span id="folder-modal-title" class="modal-title">New folder</span>
+      <button id="folder-modal-close" class="icon-btn" title="Close"><i class="ph-bold ph-x"></i></button>
     </div>
     <div class="modal-body">
-      <input id="folder-modal-name" class="search-input" type="text" placeholder="Folder name">
+      <input id="folder-modal-name" class="modal-input" type="text" placeholder="Untitled folder">
       <div class="modal-actions">
-        <button id="folder-modal-cancel" class="btn-secondary">Cancel</button>
-        <button id="folder-modal-save" class="btn-secondary btn-primary-solid">Save</button>
+        <button id="folder-modal-cancel" class="btn-flat">Cancel</button>
+        <button id="folder-modal-save" class="btn-solid-blue">Create</button>
       </div>
     </div>
   </div>
@@ -254,15 +220,15 @@
 <!-- Move Modal -->
 <div id="move-modal" class="preview-overlay" hidden>
   <div class="modal-card">
-    <div class="preview-header">
-      <span class="preview-name">Move to folder</span>
-      <button id="move-modal-close" class="icon-action-btn" title="Close"><i class="ph-bold ph-x"></i></button>
+    <div class="modal-header">
+      <span class="modal-title">Move item</span>
+      <button id="move-modal-close" class="icon-btn" title="Close"><i class="ph-bold ph-x"></i></button>
     </div>
     <div class="modal-body">
-      <select id="move-modal-folder" class="search-input"></select>
+      <select id="move-modal-folder" class="modal-input"></select>
       <div class="modal-actions">
-        <button id="move-modal-cancel" class="btn-secondary">Cancel</button>
-        <button id="move-modal-save" class="btn-secondary btn-primary-solid">Move</button>
+        <button id="move-modal-cancel" class="btn-flat">Cancel</button>
+        <button id="move-modal-save" class="btn-solid-blue">Move</button>
       </div>
     </div>
   </div>
@@ -274,8 +240,8 @@
     <div class="preview-header">
       <span id="preview-name" class="preview-name"></span>
       <div class="preview-actions">
-        <a id="preview-download" class="link-action" href="#" download>Download</a>
-        <button id="preview-close" class="icon-action-btn" title="Close"><i class="ph-bold ph-x"></i></button>
+        <a id="preview-download" class="btn-flat" href="#" download><i class="ph-bold ph-download-simple"></i> Download</a>
+        <button id="preview-close" class="icon-btn" title="Close"><i class="ph-bold ph-x"></i></button>
       </div>
     </div>
     <div id="preview-body" class="preview-body"></div>

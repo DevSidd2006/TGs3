@@ -32,6 +32,19 @@ def serialize_folder(folder) -> dict:
     return {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id}
 
 
+def format_bytes(num: int | None) -> str:
+    if not num:
+        return "0 B"
+    k = 1024
+    sizes = ["B", "KB", "MB", "GB", "TB"]
+    i = 0
+    value = float(num)
+    while value >= k and i < len(sizes) - 1:
+        value /= k
+        i += 1
+    return f"{value:.1f} {sizes[i]}" if i else f"{int(value)} B"
+
+
 def build_folder_tree(folders: list) -> list[dict]:
     children: dict[int | None, list[dict]] = {f.id: [] for f in folders}
     roots: list[dict] = []
@@ -51,6 +64,7 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     app = FastAPI(lifespan=lifespan)
     renderer = preview_renderer or PreviewRenderer(Path(".data") / "previews")
     templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
+    templates.env.filters["format_bytes"] = format_bytes
     app.mount("/static", StaticFiles(directory=str(Path(__file__).parent / "static")), name="static")
 
     @app.get("/", response_class=HTMLResponse)

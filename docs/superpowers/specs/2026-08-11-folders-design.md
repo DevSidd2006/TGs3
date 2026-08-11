@@ -2,11 +2,11 @@
 
 **Date:** 2026-08-11
 **Status:** Approved
-**Base:** Telegram Storage MVP (TeleVault) — see `2026-08-11-telegram-storage-design.md`
+**Base:** TGS3 — see `2026-08-11-telegram-storage-design.md`
 
 ## Goal
 
-Add Google-Drive-style folder organization to TeleVault: create, rename, and delete folders with unlimited nesting, navigate via a sidebar tree and breadcrumbs, upload into a chosen folder, and move existing files between folders. Tags, favorites, sharing, and auth are explicitly out of scope.
+Add Google-Drive-style folder organization to TGS3: create, rename, and delete folders with unlimited nesting, navigate via a sidebar tree and breadcrumbs, upload into a chosen folder, and move existing files between folders. Tags, favorites, sharing, and auth are explicitly out of scope.
 
 ## Data Model
 
@@ -63,7 +63,7 @@ Error mapping: 404 unknown folder/file, 400 invalid name/target, 409 non-empty d
 
 ## Frontend
 
-Extend the existing TeleVault dark theme; no new dependencies.
+Extend the existing TGS3 dark theme; no new dependencies.
 
 - **Sidebar**: replace the static nav list with a collapsible folder tree. Root entry "All Files". Each folder gets a `⋯` menu offering New Subfolder / Rename / Delete (delete disabled state not required; server enforces 409).
 - **Breadcrumb**: `All Files › Photos › 2024`, each segment clickable. Rendered from `get_breadcrumb`.

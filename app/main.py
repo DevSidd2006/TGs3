@@ -1,3 +1,4 @@
+import os
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -8,6 +9,8 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Resp
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from telethon import TelegramClient
+from telethon.sessions import StringSession
+
 
 from app.auth import hash_password, verify_password
 from app.config import load_settings
@@ -324,16 +327,27 @@ def create_app(telegram_storage: TelegramStorage | None = None) -> FastAPI:
     ensure_schema(connection)
     client: TelegramClient | None = None
     if telegram_storage is None:
-        client = TelegramClient(str(settings.telegram_session), settings.telegram_api_id, settings.telegram_api_hash)
+        session_str = os.environ.get("TELEGRAM_SESSION_STRING")
+        session_arg = StringSession(session_str) if session_str else str(settings.telegram_session)
+        client = TelegramClient(session_arg, settings.telegram_api_id, settings.telegram_api_hash)
         telegram_storage = TelethonStorage(client)
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         if client is not None:
-            await client.start()
+            bot_token = os.environ.get("TELEGRAM_BOT_TOKEN")
+            if bot_token:
+                await client.start(bot_token=bot_token)
+            else:
+                await client.connect()
+                if not await client.is_user_authorized():
+                    raise RuntimeError(
+                        "Telegram client is not authorized. Please set TELEGRAM_SESSION_STRING or TELEGRAM_BOT_TOKEN in environment variables, or upload a valid session file."
+                    )
         yield
         if client is not None:
             await client.disconnect()
+
 
     service = StorageService(FileRepository(connection), telegram_storage, channel_id=settings.telegram_channel_id)
     preview_renderer = PreviewRenderer(settings.database_path.parent / "previews")

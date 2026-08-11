@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from io import BytesIO
-from typing import Protocol
+from typing import BinaryIO, Protocol
 
 from telethon import TelegramClient
 
@@ -19,7 +19,7 @@ class DownloadedTelegramFile:
 
 
 class TelegramStorage(Protocol):
-    async def upload(self, *, channel_id: int, filename: str, content: bytes, mime_type: str | None) -> UploadedTelegramFile:
+    async def upload(self, *, channel_id: int, filename: str, content: bytes | BinaryIO, mime_type: str | None) -> UploadedTelegramFile:
         ...
 
     async def download(self, *, channel_id: int, message_id: int, filename: str, mime_type: str | None) -> DownloadedTelegramFile:
@@ -30,8 +30,11 @@ class TelethonStorage:
     def __init__(self, client: TelegramClient) -> None:
         self._client = client
 
-    async def upload(self, *, channel_id: int, filename: str, content: bytes, mime_type: str | None) -> UploadedTelegramFile:
-        file_buffer = BytesIO(content)
+    async def upload(self, *, channel_id: int, filename: str, content: bytes | BinaryIO, mime_type: str | None) -> UploadedTelegramFile:
+        if isinstance(content, bytes):
+            file_buffer = BytesIO(content)
+        else:
+            file_buffer = content
         file_buffer.name = filename
         message = await self._client.send_file(
             entity=channel_id,

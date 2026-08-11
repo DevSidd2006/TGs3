@@ -6,6 +6,155 @@ let currentFolderId = null;
 let folderModalMode = null;
 let folderModalParent = null;
 let moveFileId = null;
+let lastActiveElement = null;
+
+// --- UTILITY FUNCTIONS ---
+function trapFocus(modal) {
+  const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+  const first = focusable[0];
+  const last = focusable[focusable.length - 1];
+  
+  function handler(e) {
+    if (e.key === 'Tab') {
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last?.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first?.focus();
+      }
+    }
+    if (e.key === 'Escape') {
+      modal.hidden = true;
+      releaseFocus(modal);
+    }
+  }
+  modal._focusTrapHandler = handler;
+  modal.addEventListener('keydown', handler);
+  if (first) {
+    // slight delay to ensure modal is visible
+    setTimeout(() => first.focus(), 10);
+  }
+}
+
+function releaseFocus(modal) {
+  if (modal._focusTrapHandler) {
+    modal.removeEventListener('keydown', modal._focusTrapHandler);
+    delete modal._focusTrapHandler;
+  }
+  if (lastActiveElement) {
+    lastActiveElement.focus();
+    lastActiveElement = null;
+  }
+}
+
+function addRipple(e) {
+  const el = e.currentTarget;
+  const ripple = document.createElement('span');
+  ripple.classList.add('ripple');
+  const rect = el.getBoundingClientRect();
+  const size = Math.max(rect.width, rect.height);
+  ripple.style.width = ripple.style.height = size + 'px';
+  ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+  ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+  el.appendChild(ripple);
+  ripple.addEventListener('animationend', () => ripple.remove());
+}
+
+function showSkeleton() {
+  const sk = document.getElementById('skeleton-loader');
+  if (sk) sk.style.display = 'block';
+  const folders = document.getElementById('folders-section') || document.querySelector('.folder-grid');
+  const files = document.getElementById('files-section') || document.querySelector('.file-table');
+  if (folders) folders.style.visibility = 'hidden';
+  if (files) files.style.visibility = 'hidden';
+}
+
+function hideSkeleton() {
+  const sk = document.getElementById('skeleton-loader');
+  if (sk) sk.style.display = 'none';
+  const folders = document.getElementById('folders-section') || document.querySelector('.folder-grid');
+  const files = document.getElementById('files-section') || document.querySelector('.file-table');
+  if (folders) folders.style.visibility = 'visible';
+  if (files) files.style.visibility = 'visible';
+}
+
+function animateListItems(selector) {
+  const items = document.querySelectorAll(selector);
+  items.forEach((item, i) => {
+    item.style.animationDelay = `${i * 0.03}s`;
+    item.classList.add('file-animate-in');
+  });
+}
+
+function showToast(message) {
+  let toast = document.getElementById('toast-notification');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toast-notification';
+    toast.className = 'toast';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = message;
+  toast.classList.remove('toast-exit');
+  toast.classList.add('toast-enter');
+  toast.style.display = 'block';
+  
+  if (toast._timeout) clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(() => {
+    toast.classList.remove('toast-enter');
+    toast.classList.add('toast-exit');
+    toast.addEventListener('animationend', () => {
+      if (toast.classList.contains('toast-exit')) toast.style.display = 'none';
+    }, { once: true });
+  }, 3000);
+}
+
+function showUploadProgress(percent) {
+  let bar = document.getElementById('upload-progress');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'upload-progress';
+    bar.style.position = 'fixed';
+    bar.style.top = '0';
+    bar.style.left = '0';
+    bar.style.height = '4px';
+    bar.style.backgroundColor = '#1a73e8';
+    bar.style.zIndex = '9999';
+    bar.style.transition = 'width 0.3s ease';
+    document.body.appendChild(bar);
+  }
+  bar.style.display = 'block';
+  bar.style.width = percent + '%';
+}
+
+function hideUploadProgress() {
+  const bar = document.getElementById('upload-progress');
+  if (bar) {
+    bar.style.width = '100%';
+    setTimeout(() => {
+      bar.style.display = 'none';
+      bar.style.width = '0';
+    }, 400);
+  }
+}
+
+function toggleSidebar() {
+  const sidebar = document.querySelector('.drive-sidebar');
+  if (sidebar) sidebar.classList.toggle('open');
+}
+
+function attachRippleToElement(el) {
+    if (!el.classList.contains('ripple-container')) {
+        el.classList.add('ripple-container');
+        el.addEventListener('click', addRipple);
+    }
+}
+
+function attachRipples() {
+    document.querySelectorAll('.folder-card, .tree-row, .tree-folder, .nav-item, .btn-new, .icon-btn, .action-menu-btn, .grid-file-card, button, .toggle-pill-btn').forEach(attachRippleToElement);
+}
+// -----------------------
 
 function formatBytes(bytes, decimals = 1) {
   if (!+bytes) return '0 B';
@@ -118,7 +267,7 @@ function renderFileList() {
       const badge = getDriveBadgeDetails(file.mime_type, file.name);
 
       return `
-        <tr>
+        <tr class="ripple-container">
           <td>
             <div class="file-cell">
               <div class="file-type-icon ${badge.class}">
@@ -156,6 +305,8 @@ function renderFileList() {
         </tbody>
       </table>
     `;
+    attachRipples();
+    animateListItems(".drive-file-table tbody tr");
   } else {
     // Grid View
     let gridCardsHtml = displayFiles.map(file => {
@@ -183,10 +334,13 @@ function renderFileList() {
     }).join("");
 
     container.innerHTML = gridCardsHtml || '<div style="padding: 40px; color: #5f6368;">No files found</div>';
+    attachRipples();
+    animateListItems(".grid-file-card");
   }
 }
 
 async function refreshFiles(query = "") {
+  showSkeleton();
   try {
     const url = query
       ? `/files/search?q=${encodeURIComponent(query)}`
@@ -198,10 +352,19 @@ async function refreshFiles(query = "") {
     renderFileList();
   } catch (err) {
     console.error("Error refreshing file list:", err);
+  } finally {
+    hideSkeleton();
   }
 }
 
 async function uploadFile(file, folderId = null) {
+  showUploadProgress(10);
+  let progressInterval = setInterval(() => {
+    const bar = document.getElementById("upload-progress");
+    if (bar && parseInt(bar.style.width) < 70) {
+      bar.style.width = (parseInt(bar.style.width) + 10) + "%";
+    }
+  }, 500);
   const formData = new FormData();
   formData.append("file", file);
 
@@ -215,10 +378,14 @@ async function uploadFile(file, folderId = null) {
     if (response.ok) {
       await refreshFiles();
     } else {
-      alert("Failed to upload file.");
+      showToast("Failed to upload file.");
     }
   } catch (err) {
     console.error("Upload error:", err);
+    showToast("Upload error");
+  } finally {
+    clearInterval(progressInterval);
+    hideUploadProgress();
   }
 }
 
@@ -281,7 +448,7 @@ async function uploadFolder(fileList) {
         try {
           folderIdCache[key] = await ensureFolderPath(parts, rootParentId);
         } catch (err) {
-          alert("Failed to create folder structure. See console for details.");
+          showToast("Failed to create folder structure. See console for details.");
           continue;
         }
       }
@@ -310,6 +477,8 @@ function openPreview(fileId, fileName, mimeType) {
   }
 
   overlay.hidden = false;
+  lastActiveElement = document.activeElement;
+  trapFocus(overlay);
 }
 
 function closePreview() {
@@ -317,13 +486,14 @@ function closePreview() {
   if (!overlay || overlay.hidden) return;
   overlay.hidden = true;
   document.getElementById("preview-body").innerHTML = "";
+  releaseFocus(overlay);
 }
 
 function buildTreeHtml(nodes, depth = 0) {
   return nodes.map((node) => `
     <div class="tree-node" style="--depth: ${depth}">
       <div class="tree-row">
-        <button type="button" class="tree-folder" data-nav="${node.id}" title="${node.name}">
+        <button type="button" class="tree-folder" data-nav="${node.id}" title="${node.name}" aria-expanded="${node.children && node.children.length ? 'true' : 'false'}">
           <i class="ph-fill ph-folder" style="color: #1a73e8;"></i>
           <span>${node.name}</span>
         </button>
@@ -369,12 +539,19 @@ function openMoveModal(fileId) {
   moveFileId = fileId;
   const select = document.getElementById("move-modal-folder");
   select.innerHTML = folderOptionsHtml();
-  document.getElementById("move-modal").hidden = false;
+  const modal = document.getElementById("move-modal");
+  modal.hidden = false;
+  lastActiveElement = document.activeElement;
+  trapFocus(modal);
+  if (document.activeElement) document.activeElement.setAttribute("aria-expanded", "true");
 }
 
 function closeMoveModal() {
-  document.getElementById("move-modal").hidden = true;
+  const modal = document.getElementById("move-modal");
+  modal.hidden = true;
   moveFileId = null;
+  releaseFocus(modal);
+  document.querySelectorAll('[aria-expanded="true"]').forEach(el => el.setAttribute("aria-expanded", "false"));
 }
 
 async function saveMove() {
@@ -400,13 +577,19 @@ function openFolderModal(mode, parentId) {
   document.getElementById("folder-modal-title").textContent = mode === "create" ? "New folder" : "Rename folder";
   document.getElementById("folder-modal-name").value = "";
   document.getElementById("folder-modal").hidden = false;
-  document.getElementById("folder-modal-name").focus();
+  const modal = document.getElementById("folder-modal");
+  lastActiveElement = document.activeElement;
+  trapFocus(modal);
+  if (document.activeElement) document.activeElement.setAttribute("aria-expanded", "true");
 }
 
 function closeFolderModal() {
-  document.getElementById("folder-modal").hidden = true;
+  const modal = document.getElementById("folder-modal");
+  modal.hidden = true;
   folderModalMode = null;
   folderModalParent = null;
+  releaseFocus(modal);
+  document.querySelectorAll('[aria-expanded="true"]').forEach(el => el.setAttribute("aria-expanded", "false"));
 }
 
 async function saveFolder() {
@@ -426,7 +609,7 @@ async function saveFolder() {
     window.location.reload();
   } else {
     const err = await res.json();
-    alert(err.detail || "Failed to save folder.");
+    showToast(err.detail || "Failed to save folder.");
   }
 }
 
@@ -438,7 +621,7 @@ function folderActionMenu(folderId, folderName) {
     if (window.confirm(`Delete folder "${folderName}"? Only empty folders can be deleted.`)) {
       fetch(`/folders/${folderId}`, { method: "DELETE" }).then((res) => {
         if (res.status === 204) { loadFolderTree(); window.location.reload(); }
-        else if (res.status === 409) alert("Folder is not empty.");
+        else if (res.status === 409) showToast("Folder is not empty.");
       });
     }
   }
@@ -480,10 +663,10 @@ async function syncChannel() {
       await refreshFiles();
       window.location.reload();
     } else {
-      alert('Sync failed.');
+      showToast('Sync failed.');
     }
   } catch (err) {
-    alert('Sync error: ' + err.message);
+    showToast('Sync error: ' + err.message);
   } finally {
     if (icon) icon.classList.remove('ph-spin');
   }
@@ -493,6 +676,9 @@ async function syncChannel() {
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   document.getElementById("theme-toggle-btn")?.addEventListener("click", toggleTheme);
+  document.getElementById("sidebar-toggle")?.addEventListener("click", toggleSidebar);
+  attachRipples();
+  animateListItems(".folder-card");
 
   const searchInput = document.getElementById("search-input");
   const fileInputHeader = document.getElementById("file-input-header");

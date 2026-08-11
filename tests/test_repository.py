@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from app.db import connect_db, ensure_schema
 from app.repository import FileRepository
 
@@ -24,6 +26,20 @@ def test_repository_round_trip(tmp_path: Path):
     assert stored.telegram_message_id == 77
 
 
+def test_get_nonexistent_file_returns_none(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+    assert repository.get_file(99999) is None
+
+
+def test_get_nonexistent_folder_returns_none(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+    assert repository.get_folder(99999) is None
+
+
 def test_repository_search_matches_name(tmp_path: Path):
     connection = connect_db(tmp_path / "files.db")
     ensure_schema(connection)
@@ -37,6 +53,19 @@ def test_repository_search_matches_name(tmp_path: Path):
     result = repository.search_files("budget")
 
     assert [item.name for item in result] == ["budget-2026.xlsx"]
+
+
+def test_search_files_case_insensitive(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+
+    file = repository.create_uploading(name="DOCUMENT.PDF", size_bytes=50, mime_type="application/pdf")
+    repository.mark_failed(file.id)
+
+    results = repository.search_files("document")
+    assert len(results) == 1
+    assert results[0].name == "DOCUMENT.PDF"
 
 
 def test_schema_has_folders_table_and_folder_id_column(tmp_path: Path):
@@ -100,6 +129,14 @@ class TestFolderRepository:
             raise AssertionError("expected ValueError")
         assert repository.get_folder(child.id) is not None
 
+    def test_delete_folder_with_files_raises(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        folder = repository.create_folder(name="HasFile", parent_id=None)
+        file = repository.create_uploading(name="test.txt", size_bytes=5, mime_type="text/plain")
+        repository.move_file(file_id=file.id, folder_id=folder.id)
+        with pytest.raises(ValueError):
+            repository.delete_folder(folder.id)
+
     def test_move_file_into_and_out_of_folder(self, tmp_path: Path):
         repository = self._repo(tmp_path)
         folder = repository.create_folder(name="Docs", parent_id=None)
@@ -157,3 +194,53 @@ def test_upsert_synced_file_updates_existing_row(tmp_path: Path):
     assert len(files) == 1
     assert files[0].name == "report-v2.pdf"
     assert files[0].telegram_file_id == "file_42_new"
+
+def test_delete_file(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repo = FileRepository(connection)
+    stored = repo.create_uploading(name="test.txt", size_bytes=100, mime_type="text/plain")
+    repo.delete_file(stored.id)
+    assert repo.get_file(stored.id) is None
+
+def test_delete_file_not_found(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repo = FileRepository(connection)
+    with pytest.raises(ValueError, match="not found"):
+        repo.delete_file(999)
+
+def test_rename_file(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repo = FileRepository(connection)
+    stored = repo.create_uploading(name="old.txt", size_bytes=100, mime_type="text/plain")
+    updated = repo.rename_file(stored.id, "new.txt")
+    assert updated.name == "new.txt"
+    assert repo.get_file(stored.id).name == "new.txt"
+
+def test_rename_file_empty(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repo = FileRepository(connection)
+    stored = repo.create_uploading(name="old.txt", size_bytes=100, mime_type="text/plain")
+    with pytest.raises(ValueError, match="empty"):
+        repo.rename_file(stored.id, "   ")
+
+def test_rename_file_not_found(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repo = FileRepository(connection)
+    with pytest.raises(ValueError, match="not found"):
+        repo.rename_file(999, "new.txt")
+
+def test_db_indexes(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repo = FileRepository(connection)
+    rows = repo._connection.execute("SELECT name FROM sqlite_master WHERE type='index'").fetchall()
+    indexes = {row["name"] for row in rows}
+    assert "idx_files_folder_id" in indexes
+    assert "idx_files_telegram_lookup" in indexes
+    assert "idx_files_name" in indexes
+    assert "idx_files_status" in indexes

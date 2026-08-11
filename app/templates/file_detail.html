@@ -42,7 +42,7 @@
     </div>
 
     {% if file.status == 'ready' %}
-    <div class="detail-preview" id="detail-preview">
+    <div class="detail-preview" id="detail-preview" aria-label="File Preview">
       <iframe class="preview-frame" src="/files/{{ file.id }}/preview" title="Preview" loading="lazy"></iframe>
     </div>
     {% endif %}

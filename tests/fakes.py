@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import BinaryIO
 
 from app.telegram_bridge import DownloadedTelegramFile, UploadedTelegramFile
 
@@ -17,10 +18,14 @@ class FakeTelegramStorage:
         self._should_fail = should_fail
         self.uploads: list[UploadStub] = []
 
-    async def upload(self, *, channel_id: int, filename: str, content: bytes, mime_type: str | None) -> UploadedTelegramFile:
+    async def upload(self, *, channel_id: int, filename: str, content: bytes | BinaryIO, mime_type: str | None) -> UploadedTelegramFile:
         if self._should_fail:
             raise RuntimeError("telegram upload failed")
-        self.uploads.append(UploadStub(filename=filename, content=content, mime_type=mime_type))
+        if hasattr(content, "read"):
+            raw_content = content.read()
+        else:
+            raw_content = content
+        self.uploads.append(UploadStub(filename=filename, content=raw_content, mime_type=mime_type))
         return UploadedTelegramFile(message_id=self._message_id, file_id=self._file_id)
 
     async def download(self, *, channel_id: int, message_id: int, filename: str, mime_type: str | None) -> DownloadedTelegramFile:

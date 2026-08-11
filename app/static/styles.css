@@ -144,7 +144,6 @@ body {
   flex: 1;
   border: none;
   background: transparent;
-  outline: none;
   font-family: var(--font-family);
   font-size: 16px;
   color: var(--text-primary);
@@ -805,7 +804,6 @@ body {
   border-radius: 8px;
   font-family: var(--font-family);
   font-size: 14px;
-  outline: none;
 }
 
 .modal-input:focus {
@@ -1172,3 +1170,222 @@ body {
   animation: spin 1s linear infinite;
 }
 
+/* ==========================================================================
+   1. Accessibility - CSS Focus Styles & Visually Hidden
+   ========================================================================== */
+:focus-visible {
+  outline: 2px solid var(--drive-blue, #1a73e8);
+  outline-offset: 2px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ==========================================================================
+   3. Skeleton Loading States - CSS
+   ========================================================================== */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--drive-sidebar-bg) 25%, var(--drive-search-bg) 50%, var(--drive-sidebar-bg) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+.skeleton-folder-card { width: 100%; height: 52px; border-radius: 12px; }
+.skeleton-file-row { width: 100%; height: 48px; border-radius: 8px; margin-bottom: 4px; }
+.skeleton-text { height: 14px; border-radius: 4px; }
+.skeleton-text.short { width: 40%; }
+.skeleton-text.medium { width: 65%; }
+.skeleton-text.long { width: 90%; }
+.skeleton-avatar { width: 36px; height: 36px; border-radius: 50%; }
+
+.skeleton-folders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+/* ==========================================================================
+   5. Animation Polish - CSS
+   ========================================================================== */
+/* Toast enter/exit transitions */
+@keyframes toastIn {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes toastOut {
+  from { transform: translateY(0); opacity: 1; }
+  to { transform: translateY(20px); opacity: 0; }
+}
+.toast-enter { animation: toastIn 0.3s ease-out forwards; }
+.toast-exit { animation: toastOut 0.3s ease-in forwards; }
+
+/* Material ripple effect */
+.ripple-container { position: relative; overflow: hidden; }
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.1);
+  transform: scale(0);
+  animation: rippleAnim 0.5s ease-out forwards;
+  pointer-events: none;
+}
+[data-theme="dark"] .ripple { background: rgba(255,255,255,0.12); }
+@keyframes rippleAnim {
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* Staggered list entrance */
+@keyframes fadeSlideIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.file-animate-in {
+  animation: fadeSlideIn 0.25s ease-out forwards;
+  opacity: 0;
+}
+
+/* Upload progress bar */
+.upload-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #1a73e8, #34a853, #fbbc04, #ea4335);
+  transition: width 0.3s ease;
+  z-index: 10000;
+  border-radius: 0 2px 2px 0;
+}
+
+/* ==========================================================================
+   6. Desktop Responsive Breakpoints
+   ========================================================================== */
+#mobile-menu-btn {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  #mobile-menu-btn {
+    display: flex;
+    margin-right: 8px;
+  }
+  .drive-sidebar {
+    position: fixed;
+    left: -280px;
+    top: 0;
+    bottom: 0;
+    z-index: 1000;
+    transition: left 0.3s ease;
+    box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+  }
+  .drive-sidebar.open { left: 0; }
+  .drive-main-workspace { margin-left: 0 !important; }
+}
+@media (max-width: 768px) {
+  .folders-grid { grid-template-columns: 1fr !important; }
+  .drive-file-table th:nth-child(3),
+  .drive-file-table td:nth-child(3),
+  .drive-file-table th:nth-child(4),
+  .drive-file-table td:nth-child(4) { display: none; }
+}
+
+/* ==========================================================================
+   7. Login Page Polish
+   ========================================================================== */
+.login-app {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: var(--drive-sidebar-bg);
+  background-image: radial-gradient(var(--border-subtle) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.login-card {
+  background: var(--drive-bg);
+  padding: 40px;
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  text-align: center;
+}
+
+.login-card h1 {
+  font-size: 24px;
+  font-weight: 500;
+  margin-bottom: 8px;
+  color: var(--text-primary);
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.login-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  font-family: var(--font-family);
+  font-size: 16px;
+  background: transparent;
+  color: var(--text-primary);
+  transition: var(--transition);
+}
+
+.login-input:focus {
+  border-color: #1a73e8;
+  border-width: 2px;
+  padding: 0 15px;
+}
+
+.login-submit {
+  height: 48px;
+  background: #0b57d0;
+  color: #ffffff;
+  border: none;
+  border-radius: 24px;
+  font-family: var(--font-family);
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--transition);
+  margin-top: 8px;
+}
+
+.login-submit:hover {
+  background: #0047a1;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+
+.login-error {
+  background: #fce8e6;
+  color: #c5221f;
+  padding: 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  text-align: left;
+}

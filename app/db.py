@@ -57,4 +57,8 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         )
         """
     )
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_files_folder_id ON files(folder_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_files_telegram_lookup ON files(telegram_channel_id, telegram_message_id)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_files_name ON files(name COLLATE NOCASE)")
+    connection.execute("CREATE INDEX IF NOT EXISTS idx_files_status ON files(status)")
     connection.commit()

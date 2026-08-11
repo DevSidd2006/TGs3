@@ -104,3 +104,16 @@ def test_markdown_preview_passes_through(tmp_path: Path):
     assert preview is not None
     assert preview.mime_type == "text/markdown"
     assert preview.content == b"# Title"
+
+
+def test_render_preview_unsupported_mime_type_returns_none(tmp_path: Path):
+    renderer = PreviewRenderer(tmp_path)
+    downloaded = DownloadedTelegramFile(
+        filename="app.exe",
+        content=b"binary-bytes",
+        mime_type="application/x-executable",
+    )
+
+    preview = renderer.render(file_id=8, downloaded=downloaded)
+
+    assert preview is None

@@ -16,12 +16,14 @@
   <link rel="stylesheet" href="/mobile/mobile.css">
 </head>
 <body>
+  <div id="m-upload-bar" class="m-upload-bar" style="width:0;display:none;"></div>
+  <a href="#m-main" class="m-skip-link">Skip to content</a>
   <div class="m-app">
     <!-- Top Search Header -->
     <header class="m-top-bar">
       <div class="m-search-box">
         <button class="m-icon-btn" id="m-menu-btn" title="Menu"><i class="ph-bold ph-list"></i></button>
-        <input id="m-search-input" type="search" placeholder="Search in Drive" autocomplete="off">
+        <input id="m-search-input" class="m-search-input" type="search" placeholder="Search in Drive" autocomplete="off" aria-label="Search files">
         <button class="m-icon-btn" id="m-sync-btn" title="Sync from Telegram Channel"><i class="ph-bold ph-arrows-clockwise" id="m-sync-icon"></i></button>
         <button class="m-icon-btn" id="m-theme-btn" title="Toggle Theme"><i class="ph-bold ph-moon" id="m-theme-icon"></i></button>
         <div class="m-user-avatar" id="m-user-avatar" title="Account">D</div>
@@ -41,6 +43,17 @@
 
     <!-- Main Content Area -->
     <main class="m-content-container" id="m-main">
+      <div id="m-skeleton" style="display:none;padding:0 16px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+          <div class="m-skeleton m-skeleton-folder"></div>
+          <div class="m-skeleton m-skeleton-folder"></div>
+        </div>
+        <div class="m-skeleton m-skeleton-file"></div>
+        <div class="m-skeleton m-skeleton-file"></div>
+        <div class="m-skeleton m-skeleton-file"></div>
+        <div class="m-skeleton m-skeleton-file"></div>
+      </div>
+      
       <!-- Folders Horizontal Section -->
       <section class="m-section" id="m-folders-section">
         <div class="m-section-title">Folders</div>
@@ -78,20 +91,20 @@
     </div>
 
     <!-- Bottom Navigation Bar (Google Drive Android / iOS Style) -->
-    <nav class="m-bottom-nav">
-      <button class="nav-item active" data-tab="home">
+    <nav class="m-bottom-nav" role="navigation" aria-label="Main navigation" data-role="tablist">
+      <button class="nav-item active m-nav-item" data-tab="home" role="tab" aria-selected="true">
         <i class="ph-bold ph-house"></i>
         <span>Home</span>
       </button>
-      <button class="nav-item" data-tab="starred">
+      <button class="nav-item m-nav-item" data-tab="starred" role="tab" aria-selected="false">
         <i class="ph-bold ph-star"></i>
         <span>Starred</span>
       </button>
-      <button class="nav-item" data-tab="shared">
+      <button class="nav-item m-nav-item" data-tab="shared" role="tab" aria-selected="false">
         <i class="ph-bold ph-users-three"></i>
         <span>Shared</span>
       </button>
-      <button class="nav-item" data-tab="files">
+      <button class="nav-item m-nav-item" data-tab="files" role="tab" aria-selected="false">
         <i class="ph-bold ph-folder"></i>
         <span>Files</span>
       </button>
@@ -99,7 +112,7 @@
   </div>
 
   <!-- Creation Bottom Sheet Modal -->
-  <div class="m-modal-backdrop" id="m-create-modal" hidden>
+  <div class="m-modal-backdrop m-modal-overlay" id="m-create-modal" role="dialog" aria-modal="true" aria-label="Create new item" hidden>
     <div class="m-bottom-sheet">
       <div class="m-sheet-header">
         <h3>Create new</h3>
@@ -127,7 +140,7 @@
   </div>
 
   <!-- Move / Options Action Sheet Modal -->
-  <div class="m-modal-backdrop" id="m-options-modal" hidden>
+  <div class="m-modal-backdrop m-modal-overlay" id="m-options-modal" role="dialog" aria-modal="true" aria-label="File options" hidden>
     <div class="m-bottom-sheet">
       <div class="m-sheet-header">
         <h3 id="m-options-title">File Options</h3>
@@ -159,7 +172,7 @@
   <input type="file" id="m-hidden-folder-input" webkitdirectory multiple hidden>
 
   <!-- Toast Notification -->
-  <div id="m-toast" class="m-toast" hidden></div>
+  <div id="m-toast" class="m-toast" aria-live="polite" role="status" hidden></div>
 
   <script src="/mobile/mobile.js" defer></script>
 </body>

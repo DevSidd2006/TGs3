@@ -70,3 +70,24 @@ class StorageService:
             filename=stored.name,
             mime_type=stored.mime_type,
         )
+
+    async def sync_from_channel(self) -> int:
+        if not hasattr(self._telegram, "list_channel_files"):
+            return 0
+        try:
+            files = await self._telegram.list_channel_files(channel_id=self._channel_id)
+        except Exception:
+            return 0
+        count = 0
+        for item in files:
+            self._repository.upsert_synced_file(
+                name=item["name"],
+                size_bytes=item["size_bytes"],
+                mime_type=item["mime_type"],
+                telegram_channel_id=item["telegram_channel_id"],
+                telegram_message_id=item["telegram_message_id"],
+                telegram_file_id=item["telegram_file_id"],
+            )
+            count += 1
+        return count
+

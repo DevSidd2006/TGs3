@@ -25,3 +25,16 @@ class FakeTelegramStorage:
 
     async def download(self, *, channel_id: int, message_id: int, filename: str, mime_type: str | None) -> DownloadedTelegramFile:
         return DownloadedTelegramFile(filename=filename, content=b"downloaded", mime_type=mime_type)
+
+    async def list_channel_files(self, *, channel_id: int) -> list[dict]:
+        return [
+            {
+                "telegram_channel_id": channel_id,
+                "telegram_message_id": 101,
+                "telegram_file_id": "file_101",
+                "name": "synced_doc.pdf",
+                "size_bytes": 2048,
+                "mime_type": "application/pdf",
+            }
+        ]
+

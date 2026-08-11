@@ -141,3 +141,10 @@ def test_dashboard_scoped_to_folder_shows_breadcrumb(app_client: TestClient):
     response = app_client.get("/", params={"folder_id": folder["id"]})
     assert response.status_code == 200
     assert "Photos" in response.text
+
+
+def test_sync_endpoint_returns_count(app_client: TestClient):
+    response = app_client.post("/sync")
+    assert response.status_code == 200
+    assert response.json() == {"synced_count": 1}
+

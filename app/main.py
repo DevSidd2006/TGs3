@@ -275,6 +275,13 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
             headers={"Content-Disposition": f'inline; filename="{preview.filename}"'},
         )
 
+    @app.post("/sync")
+    async def sync_channel(request: Request):
+        require_auth_route(request)
+        count = await service.sync_from_channel()
+        return {"synced_count": count}
+
+
     MOBILE_DIR = Path(__file__).parent.parent / "mobile"
 
     @app.get("/mobile", response_class=HTMLResponse)

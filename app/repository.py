@@ -32,7 +32,35 @@ class FileRepository:
         self._connection.execute("UPDATE files SET status = 'failed' WHERE id = ?", (file_id,))
         self._connection.commit()
 
+    def upsert_synced_file(self, *, name: str, size_bytes: int, mime_type: str | None, telegram_channel_id: int, telegram_message_id: int, telegram_file_id: str) -> StoredFile:
+        existing = self._connection.execute(
+            "SELECT id FROM files WHERE telegram_channel_id = ? AND telegram_message_id = ?",
+            (telegram_channel_id, telegram_message_id),
+        ).fetchone()
+        if existing:
+            self._connection.execute(
+                """
+                UPDATE files
+                SET name = ?, size_bytes = ?, mime_type = ?, telegram_file_id = ?, status = 'ready'
+                WHERE id = ?
+                """,
+                (name, size_bytes, mime_type, telegram_file_id, existing["id"]),
+            )
+            self._connection.commit()
+            return self.get_file(existing["id"])  # type: ignore[return-value]
+        else:
+            cursor = self._connection.execute(
+                """
+                INSERT INTO files (name, size_bytes, mime_type, status, telegram_channel_id, telegram_message_id, telegram_file_id)
+                VALUES (?, ?, ?, 'ready', ?, ?, ?)
+                """,
+                (name, size_bytes, mime_type, telegram_channel_id, telegram_message_id, telegram_file_id),
+            )
+            self._connection.commit()
+            return self.get_file(cursor.lastrowid)  # type: ignore[return-value]
+
     def get_file(self, file_id: int) -> StoredFile | None:
+
         row = self._connection.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
         return None if row is None else self._row_to_model(row)
 

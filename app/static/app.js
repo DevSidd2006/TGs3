@@ -469,6 +469,25 @@ function toggleTheme() {
   applyTheme(next);
 }
 
+async function syncChannel() {
+  const icon = document.getElementById('sync-icon');
+  if (icon) icon.classList.add('ph-spin');
+  try {
+    const res = await fetch('/sync', { method: 'POST' });
+    if (res.ok) {
+      await refreshFiles();
+      window.location.reload();
+    } else {
+      alert('Sync failed.');
+    }
+  } catch (err) {
+    alert('Sync error: ' + err.message);
+  } finally {
+    if (icon) icon.classList.remove('ph-spin');
+  }
+}
+
+
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   document.getElementById("theme-toggle-btn")?.addEventListener("click", toggleTheme);

@@ -510,6 +510,22 @@ Apply protection to protected routes:
 - **JSON API** (`list_files`, `search_files`, `folder_tree`, `create_folder`, `rename_folder`, `delete_folder`, `move_file`, `file_detail`, `download_file`, `preview_file`): add `require_auth_route(request)` as the first line.
 - Exempt: `/login`, `/static`, `/mobile/manifest.webmanifest`, `/mobile/sw.js`, `/mobile/icons/*` (no auth call).
 
+Wire `create_app` (the real `app.asgi:app` entrypoint) to pass auth settings — otherwise production auth silently stays off. In `create_app`, replace the final return with:
+
+```python
+    service = StorageService(FileRepository(connection), telegram_storage, channel_id=settings.telegram_channel_id)
+    preview_renderer = PreviewRenderer(settings.database_path.parent / "previews")
+    return build_app(
+        service,
+        lifespan=lifespan,
+        preview_renderer=preview_renderer,
+        auth_password=settings.tgs3_password,
+        auth_username=settings.tgs3_user,
+        session_ttl_days=settings.session_ttl_days,
+        secure_cookie=settings.secure_cookie,
+    )
+```
+
 - [ ] **Step 5: Create login template**
 
 Create `app/templates/login.html`:

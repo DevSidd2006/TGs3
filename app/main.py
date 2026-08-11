@@ -294,4 +294,12 @@ def create_app(telegram_storage: TelegramStorage | None = None) -> FastAPI:
 
     service = StorageService(FileRepository(connection), telegram_storage, channel_id=settings.telegram_channel_id)
     preview_renderer = PreviewRenderer(settings.database_path.parent / "previews")
-    return build_app(service, lifespan=lifespan, preview_renderer=preview_renderer)
+    return build_app(
+        service,
+        lifespan=lifespan,
+        preview_renderer=preview_renderer,
+        auth_password=settings.tgs3_password,
+        auth_username=settings.tgs3_user,
+        session_ttl_days=settings.session_ttl_days,
+        secure_cookie=settings.secure_cookie,
+    )

@@ -55,11 +55,15 @@ class TelethonStorage:
         async for message in self._client.iter_messages(channel_id, limit=limit):
             if message.file is None:
                 continue
+            try:
+                file_id = str(message.file.id)
+            except Exception:
+                file_id = f"msg_{message.id}"
             files.append(
                 {
                     "telegram_channel_id": channel_id,
                     "telegram_message_id": message.id,
-                    "telegram_file_id": str(message.file.id),
+                    "telegram_file_id": file_id,
                     "name": message.file.name or message.message or f"file_{message.id}",
                     "size_bytes": message.file.size,
                     "mime_type": message.file.mime_type,

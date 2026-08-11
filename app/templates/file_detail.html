@@ -1,50 +1,98 @@
 {% extends "base.html" %}
 {% block body %}
-<div class="detail-container">
-  <a href="/" class="back-link">
-    <i class="ph-bold ph-arrow-left"></i> Back to Dashboard
-  </a>
-
-  <div class="detail-header">
-    <div class="detail-icon-box">
-      <i class="ph-bold ph-file"></i>
+<div class="detail-app">
+  <header class="detail-header">
+    <div class="detail-header-left">
+      <a href="/" class="drive-logo">
+        <svg class="google-drive-icon" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
+          <path d="M12 2L3.5 17h5.2L12 10.6 15.3 17h5.2L12 2z" fill="#1a73e8"/>
+          <path d="M12 10.6L8.7 17h6.6L12 10.6z" fill="#0b57d0"/>
+          <path d="M3.5 17l2.6 4.5a3 3 0 002.6 1.5h6.6c1.1 0 2.1-.6 2.6-1.5l2.6-4.5h-5.2L12 19l-3.3-2H3.5z" fill="#66b5f6"/>
+          <path d="M12 2v5.4l3.3 9.6h5.2L12 2z" fill="#4285f4"/>
+        </svg>
+        <span class="drive-title">TGS3</span>
+      </a>
     </div>
-    <div class="detail-title-group">
-      <h1>{{ file.name }}</h1>
+    <div class="detail-header-right">
+      <button class="icon-btn" id="theme-toggle-btn" title="Toggle theme (Light / Dark)"><i class="ph-bold ph-moon" id="theme-toggle-icon"></i></button>
+    </div>
+  </header>
+
+  <div class="detail-main">
+    <a href="/" class="back-link">
+      <i class="ph-bold ph-arrow-left"></i> All Files
+    </a>
+
+    <div class="detail-file-card">
+      <div class="detail-icon-box">
+        <i class="ph-fill ph-file-text"></i>
+      </div>
+      <div class="detail-title-group">
+        <h1>{{ file.name }}</h1>
+        <div class="detail-meta-line">
+          <span class="file-size-text">{{ file.size_bytes | format_bytes }}</span>
+          <span class="meta-sep">&bull;</span>
+          <span class="file-modified-text">{{ file.uploaded_at[:10] if file.uploaded_at else "Recently" }}</span>
+        </div>
+      </div>
       <span class="status-badge status-{{ file.status }}">
         <i class="ph-bold {% if file.status == 'ready' %}ph-check-circle{% elif file.status == 'uploading' %}ph-spinner-gap spin{% else %}ph-x-circle{% endif %}"></i>
         {{ file.status }}
       </span>
     </div>
-  </div>
 
-  <div class="detail-grid">
-    <div class="detail-card">
-      <label>File ID</label>
-      <span>#{{ file.id }}</span>
+    {% if file.status == 'ready' %}
+    <div class="detail-preview" id="detail-preview">
+      <iframe class="preview-frame" src="/files/{{ file.id }}/preview" title="Preview" loading="lazy"></iframe>
     </div>
-    <div class="detail-card">
-      <label>File Size</label>
-      <span>{{ file.size_bytes }} Bytes</span>
+    {% endif %}
+
+    <div class="detail-grid">
+      <div class="detail-card">
+        <label>File ID</label>
+        <span>#{{ file.id }}</span>
+      </div>
+      <div class="detail-card">
+        <label>File Size</label>
+        <span>{{ file.size_bytes | format_bytes }}</span>
+      </div>
+      <div class="detail-card">
+        <label>MIME Type</label>
+        <span>{{ file.mime_type or "unknown" }}</span>
+      </div>
+      <div class="detail-card">
+        <label>Uploaded At</label>
+        <span>{{ file.uploaded_at[:10] if file.uploaded_at else "Recently" }}</span>
+      </div>
     </div>
-    <div class="detail-card">
-      <label>MIME Type</label>
-      <span>{{ file.mime_type or "unknown" }}</span>
-    </div>
-    <div class="detail-card">
-      <label>Uploaded At</label>
-      <span style="font-size: 13px;">{{ file.uploaded_at if file.uploaded_at else "Recently" }}</span>
+
+    <div class="detail-actions">
+      {% if file.status == 'ready' %}
+      <a href="/files/{{ file.id }}/download" class="btn-download-primary">
+        <i class="ph-bold ph-download-simple"></i> Download
+      </a>
+      <button id="btn-close-preview" class="btn-download-secondary" onclick="toggleDetailPreview()">
+        <i class="ph-bold ph-eye-slash"></i> Hide preview
+      </button>
+      {% else %}
+      <button class="btn-download-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
+        <i class="ph-bold ph-clock"></i> File is processing...
+      </button>
+      {% endif %}
     </div>
   </div>
-
-  {% if file.status == 'ready' %}
-  <a href="/files/{{ file.id }}/download" class="btn-download-primary">
-    <i class="ph-bold ph-download-simple"></i> Download File from Telegram
-  </a>
-  {% else %}
-  <button class="btn-download-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
-    <i class="ph-bold ph-clock"></i> File is processing...
-  </button>
-  {% endif %}
 </div>
+
+<script>
+  function toggleDetailPreview() {
+    const preview = document.getElementById("detail-preview");
+    const btn = document.getElementById("btn-close-preview");
+    if (!preview || !btn) return;
+    const hidden = preview.style.display === "none";
+    preview.style.display = hidden ? "" : "none";
+    btn.innerHTML = hidden
+      ? '<i class="ph-bold ph-eye-slash"></i> Hide preview'
+      : '<i class="ph-bold ph-eye"></i> Show preview';
+  }
+</script>
 {% endblock %}

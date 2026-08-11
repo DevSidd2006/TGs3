@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>TGS3</title>
+  <link rel="manifest" href="/mobile/manifest.webmanifest">
+  <meta name="theme-color" content="#1a73e8">
+  <link rel="apple-touch-icon" href="/mobile/icons/icon-192.png">
+  <link rel="stylesheet" href="/mobile/mobile.css">
+</head>
+<body>
+  <header class="m-header">
+    <h1 class="m-brand">TGS3</h1>
+    <div class="m-search">
+      <input id="m-search" type="search" placeholder="Search files" autocomplete="off">
+    </div>
+    <button id="m-logout" class="m-icon-btn" title="Log out">⏻</button>
+  </header>
+
+  <nav id="m-breadcrumb" class="m-breadcrumb"></nav>
+
+  <main id="m-main" class="m-main">
+    <div id="m-empty" class="m-empty" hidden>No files yet. Tap + to upload.</div>
+    <ul id="m-file-list" class="m-file-list"></ul>
+  </main>
+
+  <div class="m-fab">
+    <input id="m-upload-input" type="file" multiple hidden>
+    <button id="m-upload-btn" class="m-fab-btn" title="Upload">+</button>
+  </div>
+
+  <div id="m-toast" class="m-toast" hidden></div>
+  <script src="/mobile/mobile.js" defer></script>
+</body>
+</html>

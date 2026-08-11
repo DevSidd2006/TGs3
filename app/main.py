@@ -272,6 +272,35 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
             headers={"Content-Disposition": f'inline; filename="{preview.filename}"'},
         )
 
+    MOBILE_DIR = Path(__file__).parent.parent / "mobile"
+
+    @app.get("/mobile", response_class=HTMLResponse)
+    def mobile_page(request: Request):
+        require_page_route(request)
+        return HTMLResponse((MOBILE_DIR / "mobile.html").read_text())
+
+    @app.get("/mobile/manifest.webmanifest")
+    def mobile_manifest():
+        return Response(
+            content=(MOBILE_DIR / "manifest.webmanifest").read_text(),
+            media_type="application/manifest+json",
+        )
+
+    @app.get("/mobile/sw.js")
+    def mobile_sw():
+        return Response(
+            content=(MOBILE_DIR / "sw.js").read_text(),
+            media_type="application/javascript",
+            headers={"Service-Worker-Allowed": "/", "Content-Type": "application/javascript; serviceworker"},
+        )
+
+    @app.get("/mobile/icons/{name}")
+    def mobile_icon(name: str):
+        allowed = {"icon-192.png", "icon-512.png"}
+        if name not in allowed:
+            raise HTTPException(status_code=404, detail="icon not found")
+        return Response(content=(MOBILE_DIR / "icons" / name).read_bytes(), media_type="image/png")
+
     return app
 
 

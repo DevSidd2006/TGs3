@@ -22,7 +22,6 @@ class Settings:
     session_ttl_days: int = 30
     sync_cooldown_seconds: int = 60
     secure_cookie: bool = False
-    max_upload_bytes: int = 2 * 1024 * 1024 * 1024
 
 
 
@@ -40,6 +39,5 @@ def load_settings() -> Settings:
         session_ttl_days=int(os.environ.get("TGS3_SESSION_TTL_DAYS", "30")),
         sync_cooldown_seconds=int(os.environ.get("TGS3_SYNC_COOLDOWN_SECONDS", "60")),
         secure_cookie=os.environ.get("TGS3_SECURE_COOKIE", "0") == "1",
-        max_upload_bytes=int(os.environ.get("TGS3_MAX_UPLOAD_BYTES", 2 * 1024 * 1024 * 1024)),
     )
 

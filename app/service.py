@@ -1,6 +1,3 @@
-from io import BytesIO
-from typing import BinaryIO
-
 from app.repository import FileRepository
 from app.telegram_bridge import DownloadedTelegramFile, TelegramStorage
 
@@ -11,15 +8,15 @@ class StorageService:
         self._telegram = telegram
         self._channel_id = channel_id
 
-    async def upload_stream(self, *, filename: str, file_obj: BinaryIO, size_bytes: int, mime_type: str | None, folder_id: int | None = None):
-        stored = self._repository.create_uploading(name=filename, size_bytes=size_bytes, mime_type=mime_type)
+    async def upload_bytes(self, *, filename: str, content: bytes, mime_type: str | None, folder_id: int | None = None):
+        stored = self._repository.create_uploading(name=filename, size_bytes=len(content), mime_type=mime_type)
         if folder_id is not None:
             self._repository.move_file(file_id=stored.id, folder_id=folder_id)
         try:
             uploaded = await self._telegram.upload(
                 channel_id=self._channel_id,
                 filename=filename,
-                content=file_obj,
+                content=content,
                 mime_type=mime_type,
             )
             self._repository.mark_ready(
@@ -32,15 +29,6 @@ class StorageService:
             self._repository.mark_failed(stored.id)
             raise
         return self._repository.get_file(stored.id)
-
-    async def upload_bytes(self, *, filename: str, content: bytes, mime_type: str | None, folder_id: int | None = None):
-        return await self.upload_stream(
-            filename=filename,
-            file_obj=BytesIO(content),
-            size_bytes=len(content),
-            mime_type=mime_type,
-            folder_id=folder_id,
-        )
 
     def list_files(self, folder_id: int | None = None):
         return self._repository.list_files(folder_id)
@@ -65,12 +53,6 @@ class StorageService:
 
     def get_breadcrumb(self, folder_id: int):
         return self._repository.get_breadcrumb(folder_id)
-
-    def delete_file(self, file_id: int) -> None:
-        return self._repository.delete_file(file_id)
-
-    def rename_file(self, file_id: int, name: str):
-        return self._repository.rename_file(file_id, name)
 
     def search_files(self, query: str):
         return self._repository.search_files(query)

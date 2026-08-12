@@ -1,5 +1,5 @@
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 import sqlite3
 
 from app.models import Folder, StoredFile
@@ -16,24 +16,6 @@ class FileRepository:
         )
         self._connection.commit()
         return self.get_file(cursor.lastrowid)  # type: ignore[return-value]
-
-    def delete_file(self, file_id: int) -> None:
-        if self.get_file(file_id) is None:
-            raise ValueError(f"file {file_id} not found")
-        self._connection.execute("DELETE FROM files WHERE id = ?", (file_id,))
-        self._connection.commit()
-
-    def rename_file(self, file_id: int, name: str) -> StoredFile:
-        name = name.strip()
-        if not name:
-            raise ValueError("file name must not be empty")
-        if self.get_file(file_id) is None:
-            raise ValueError(f"file {file_id} not found")
-        self._connection.execute("UPDATE files SET name = ? WHERE id = ?", (name, file_id))
-        self._connection.commit()
-        updated = self.get_file(file_id)
-        assert updated is not None
-        return updated
 
     def mark_ready(self, *, file_id: int, telegram_channel_id: int, telegram_message_id: int, telegram_file_id: str) -> None:
         self._connection.execute(
@@ -136,9 +118,7 @@ class FileRepository:
         file_count = self._connection.execute(
             "SELECT COUNT(*) AS count FROM files WHERE folder_id = ?", (folder_id,)
         ).fetchone()
-        if file_count["count"] > 0:
-            raise ValueError(f"folder {folder_id} contains files")
-        if direct_children["count"] > 0:
+        if direct_children["count"] > 0 or file_count["count"] > 0:
             raise ValueError(f"folder {folder_id} is not empty")
         self._connection.execute("DELETE FROM folders WHERE id = ?", (folder_id,))
         self._connection.commit()
@@ -225,7 +205,7 @@ class AuthRepository:
 
     def create_session(self, *, username: str, ttl: timedelta) -> str:
         token = secrets.token_urlsafe(32)
-        expires = (datetime.now(timezone.utc) + ttl).isoformat()
+        expires = (datetime.utcnow() + ttl).isoformat()
         self._connection.execute(
             "INSERT INTO sessions (token, username, expires_at) VALUES (?, ?, ?)",
             (token, username, expires),
@@ -240,9 +220,7 @@ class AuthRepository:
         if row is None:
             return None
         expires = datetime.fromisoformat(row["expires_at"])
-        if expires.tzinfo is None:
-            expires = expires.replace(tzinfo=timezone.utc)
-        if expires <= datetime.now(timezone.utc):
+        if expires <= datetime.utcnow():
             self.delete_session(token)
             return None
         return row["username"]

@@ -34,16 +34,7 @@ function showToast(msg) {
   if (!toast) return;
   toast.textContent = msg;
   toast.hidden = false;
-  toast.classList.remove('hide');
-  toast.classList.add('show');
-  setTimeout(() => {
-    toast.classList.remove('show');
-    toast.classList.add('hide');
-    setTimeout(() => {
-      toast.hidden = true;
-      toast.classList.remove('hide');
-    }, 300);
-  }, 3000);
+  setTimeout(() => { toast.hidden = true; }, 3000);
 }
 
 function initTheme() {
@@ -65,84 +56,7 @@ function toggleTheme() {
   applyTheme(curr === "dark" ? "light" : "dark");
 }
 
-function mTrapFocus(modal) {
-  const focusable = modal.querySelectorAll('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
-  if (!focusable.length) return;
-  const first = focusable[0];
-  const last = focusable[focusable.length - 1];
-  function handler(e) {
-    if (e.key === 'Tab') {
-      if (e.shiftKey && document.activeElement === first) {
-        e.preventDefault(); last.focus();
-      } else if (!e.shiftKey && document.activeElement === last) {
-        e.preventDefault(); first.focus();
-      }
-    }
-    if (e.key === 'Escape') closeAllModals();
-  }
-  modal._focusTrap = handler;
-  modal.addEventListener('keydown', handler);
-  first.focus();
-}
-
-function mReleaseFocus(modal) {
-  if (modal._focusTrap) modal.removeEventListener('keydown', modal._focusTrap);
-}
-
-function mAddRipple(e) {
-  const el = e.currentTarget;
-  const ripple = document.createElement('span');
-  ripple.classList.add('m-ripple');
-  const rect = el.getBoundingClientRect();
-  const size = Math.max(rect.width, rect.height);
-  ripple.style.width = ripple.style.height = size + 'px';
-  ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
-  ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
-  el.appendChild(ripple);
-  ripple.addEventListener('animationend', () => ripple.remove());
-}
-
-function mShowSkeleton() {
-  const sk = document.getElementById('m-skeleton');
-  if (sk) sk.style.display = 'block';
-  const folders = document.getElementById('m-folders-section');
-  const files = document.getElementById('m-files-section') || document.getElementById('m-file-list');
-  if (folders) folders.style.display = 'none';
-  if (files) files.style.display = 'none';
-}
-
-function mHideSkeleton() {
-  const sk = document.getElementById('m-skeleton');
-  if (sk) sk.style.display = 'none';
-  const folders = document.getElementById('m-folders-section');
-  const files = document.getElementById('m-files-section') || document.getElementById('m-file-list');
-  if (folders) folders.style.display = '';
-  if (files) files.style.display = '';
-}
-
-function mAnimateItems(selector) {
-  const items = document.querySelectorAll(selector);
-  items.forEach((item, i) => {
-    item.style.animationDelay = `${i * 0.04}s`;
-    item.classList.add('m-animate-in');
-  });
-}
-
-function mShowUploadProgress(percent) {
-  const bar = document.getElementById('m-upload-bar');
-  if (bar) { bar.style.display = 'block'; bar.style.width = percent + '%'; }
-}
-
-function mHideUploadProgress() {
-  const bar = document.getElementById('m-upload-bar');
-  if (bar) {
-    bar.style.width = '100%';
-    setTimeout(() => { bar.style.display = 'none'; bar.style.width = '0'; }, 400);
-  }
-}
-
 async function loadFolderTree() {
-  mShowSkeleton();
   try {
     const res = await fetch("/folders");
     if (res.ok) {
@@ -152,7 +66,6 @@ async function loadFolderTree() {
   } catch (err) {
     console.error("Error loading folders:", err);
   }
-  mHideSkeleton();
 }
 
 function renderFolders() {
@@ -185,16 +98,14 @@ function renderFolders() {
   sec.style.display = "block";
 
   grid.innerHTML = currentSubfolders.map(folder => `
-    <div class="m-folder-card m-ripple-container" data-id="${folder.id}">
+    <div class="m-folder-card" data-id="${folder.id}">
       <i class="ph-fill ph-folder m-folder-icon"></i>
       <span class="m-folder-name">${folder.name}</span>
     </div>
   `).join("");
-  mAnimateItems(".m-folder-card");
 }
 
 async function refreshFiles(query = "") {
-  mShowSkeleton();
   try {
     const url = query
       ? `/files/search?q=${encodeURIComponent(query)}`
@@ -208,7 +119,6 @@ async function refreshFiles(query = "") {
   } catch (err) {
     console.error("Error refreshing files:", err);
   }
-  mHideSkeleton();
 }
 
 function renderFiles() {
@@ -226,12 +136,11 @@ function renderFiles() {
   if (empty) empty.hidden = displayFiles.length > 0;
 
   list.className = `m-files-list ${viewMode}-mode`;
-  list.setAttribute("role", "list");
 
   list.innerHTML = displayFiles.map(file => {
     const badge = getBadgeInfo(file.mime_type, file.name);
     return `
-      <div class="m-file-card m-ripple-container" data-id="${file.id}" role="listitem">
+      <div class="m-file-card" data-id="${file.id}">
         <div class="m-file-icon-box ${badge.class}">
           <i class="ph-fill ${badge.icon}"></i>
         </div>
@@ -239,38 +148,32 @@ function renderFiles() {
           <div class="m-file-title">${file.name}</div>
           <div class="m-file-sub">${formatBytes(file.size_bytes)} • ${formatDate(file.uploaded_at)}</div>
         </div>
-        <button class="m-file-more m-ripple-container" data-action="options" data-id="${file.id}" data-name="${file.name}" aria-label="Options">
+        <button class="m-file-more" data-action="options" data-id="${file.id}" data-name="${file.name}">
           <i class="ph-bold ph-dots-three-vertical"></i>
         </button>
       </div>
     `;
   }).join("");
-  mAnimateItems(".m-file-card");
 }
 
 async function uploadFiles(fileList) {
-  mShowUploadProgress(10);
   for (const file of Array.from(fileList)) {
     const formData = new FormData();
     formData.append("file", file);
     const folderParam = currentFolderId ? `?folder_id=${currentFolderId}` : "";
     try {
       showToast(`Uploading ${file.name}...`);
-      mShowUploadProgress(50);
       const res = await fetch(`/files/upload${folderParam}`, { method: "POST", body: formData });
       if (res.ok) {
         showToast(`Uploaded ${file.name}`);
       } else {
         showToast(`Failed to upload ${file.name}`);
       }
-      mShowUploadProgress(70);
     } catch (err) {
       showToast("Upload error");
     }
   }
-  mShowUploadProgress(100);
   await refreshFiles();
-  mHideUploadProgress();
 }
 
 async function findChildFolder(folderId, name) {
@@ -313,7 +216,6 @@ async function ensureFolderPath(parts, rootParentId) {
 }
 
 async function uploadFolder(fileList) {
-  mShowUploadProgress(10);
   const rootParentId = currentFolderId;
   const grouped = {};
   for (const file of Array.from(fileList)) {
@@ -345,53 +247,32 @@ async function uploadFolder(fileList) {
       const folderParam = leafId ? `?folder_id=${leafId}` : "";
       try {
         showToast(`Uploading ${file.name}...`);
-        mShowUploadProgress(50);
         const res = await fetch(`/files/upload${folderParam}`, { method: "POST", body: formData });
         showToast(res.ok ? `Uploaded ${file.name}` : `Failed to upload ${file.name}`);
-        mShowUploadProgress(70);
       } catch (err) {
         showToast("Upload error");
       }
     }
   }
-  mShowUploadProgress(100);
   await refreshFiles();
   await loadFolderTree();
-  mHideUploadProgress();
 }
 
 function openCreateModal() {
-  const m = document.getElementById("m-create-modal");
-  m.hidden = false;
-  m.setAttribute('aria-hidden', 'false');
-  mTrapFocus(m);
+  document.getElementById("m-create-modal").hidden = false;
 }
 function closeCreateModal() {
-  const m = document.getElementById("m-create-modal");
-  m.hidden = true;
-  m.setAttribute('aria-hidden', 'true');
-  mReleaseFocus(m);
+  document.getElementById("m-create-modal").hidden = true;
 }
 
 function openOptionsModal(fileId, fileName) {
   selectedFileId = fileId;
   document.getElementById("m-options-title").textContent = fileName || "File Options";
-  const m = document.getElementById("m-options-modal");
-  m.hidden = false;
-  m.setAttribute('aria-hidden', 'false');
-  mTrapFocus(m);
+  document.getElementById("m-options-modal").hidden = false;
 }
 function closeOptionsModal() {
-  const m = document.getElementById("m-options-modal");
-  m.hidden = true;
-  m.setAttribute('aria-hidden', 'true');
-  mReleaseFocus(m);
+  document.getElementById("m-options-modal").hidden = true;
   selectedFileId = null;
-}
-
-function closeAllModals() {
-  closeCreateModal();
-  closeOptionsModal();
 }
 
 async function promptCreateFolder() {
@@ -419,19 +300,6 @@ document.addEventListener("DOMContentLoaded", () => {
   initTheme();
   refreshFiles();
   loadFolderTree();
-
-  // Add ripple container classes to static elements
-  document.querySelectorAll(".m-fab-btn, .m-option-row").forEach(el => {
-    el.classList.add("m-ripple-container");
-  });
-
-  // Ripple event delegation
-  document.addEventListener("click", (e) => {
-    const target = e.target.closest(".m-folder-card, .m-file-card, .m-nav-item, .m-fab-btn, .m-option-row");
-    if (target) {
-      mAddRipple({ currentTarget: target, clientX: e.clientX, clientY: e.clientY });
-    }
-  });
 
   // Search
   document.getElementById("m-search-input")?.addEventListener("input", (e) => {
@@ -534,15 +402,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Bottom Navigation Tabs
   document.querySelectorAll(".m-bottom-nav .nav-item").forEach(btn => {
-    btn.classList.add("m-ripple-container");
-    btn.setAttribute("aria-selected", btn.classList.contains("active") ? "true" : "false");
     btn.addEventListener("click", () => {
-      document.querySelectorAll(".m-bottom-nav .nav-item").forEach(b => {
-        b.classList.remove("active");
-        b.setAttribute("aria-selected", "false");
-      });
+      document.querySelectorAll(".m-bottom-nav .nav-item").forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
-      btn.setAttribute("aria-selected", "true");
       activeTab = btn.dataset.tab;
       refreshFiles();
     });

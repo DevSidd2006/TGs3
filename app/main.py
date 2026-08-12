@@ -5,9 +5,8 @@ from datetime import timedelta
 from pathlib import Path
 from typing import AsyncIterator
 
-import io
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from telethon import TelegramClient
@@ -92,7 +91,7 @@ def require_page(request: Request, *, auth_password: str, auth_repo: AuthReposit
         raise RedirectRequest("/login")
 
 
-def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None, *, auth_password: str = "", auth_username: str = "admin", auth_repository: AuthRepository | None = None, session_ttl_days: int = 30, secure_cookie: bool = True, sync_cooldown_seconds: int = 60, max_upload_bytes: int = 2 * 1024 * 1024 * 1024) -> FastAPI:
+def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None, *, auth_password: str = "", auth_username: str = "admin", auth_repository: AuthRepository | None = None, session_ttl_days: int = 30, secure_cookie: bool = True, sync_cooldown_seconds: int = 60) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     renderer = preview_renderer or PreviewRenderer(Path(".data") / "previews")
     templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -181,18 +180,9 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     @app.post("/files/upload", status_code=201)
     async def upload(request: Request, file: UploadFile = File(...), folder_id: int | None = None):
         require_auth_route(request)
-        size_bytes = file.size
-        if size_bytes is None:
-            file.file.seek(0, os.SEEK_END)
-            size_bytes = file.file.tell()
-            file.file.seek(0)
-        if size_bytes > max_upload_bytes:
-            raise HTTPException(status_code=413, detail=f"File too large. Maximum allowed size is {max_upload_bytes} bytes.")
-
-        stored = await service.upload_stream(
+        stored = await service.upload_bytes(
             filename=file.filename or "upload.bin",
-            file_obj=file.file,
-            size_bytes=size_bytes,
+            content=await file.read(),
             mime_type=file.content_type,
             folder_id=folder_id,
         )
@@ -239,8 +229,6 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         try:
             service.delete_folder(folder_id)
         except ValueError as exc:
-            if "contains files" in str(exc):
-                raise HTTPException(status_code=400, detail=str(exc)) from exc
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return Response(status_code=204)
 
@@ -253,26 +241,6 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return serialize_file(stored)
 
-    @app.delete("/files/{file_id}", status_code=204)
-    def delete_file(request: Request, file_id: int):
-        require_auth_route(request)
-        try:
-            service.delete_file(file_id)
-        except ValueError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        return Response(status_code=204)
-
-    @app.patch("/files/{file_id}")
-    def rename_file(request: Request, file_id: int, payload: dict):
-        require_auth_route(request)
-        if service.get_file(file_id) is None:
-            raise HTTPException(status_code=404, detail=f"file {file_id} not found")
-        try:
-            file = service.rename_file(file_id, payload.get("name", ""))
-        except ValueError as exc:
-            raise HTTPException(status_code=400, detail=str(exc)) from exc
-        return serialize_file(file)
-
     @app.get("/files/{file_id}")
     def file_detail(request: Request, file_id: int):
         require_auth_route(request)
@@ -284,13 +252,9 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     @app.get("/files/{file_id}/download")
     async def download_file(request: Request, file_id: int):
         require_auth_route(request)
-        try:
-            downloaded = await service.download_file(file_id)
-        except FileNotFoundError as exc:
-            raise HTTPException(status_code=404, detail=str(exc)) from exc
-        stream = io.BytesIO(downloaded.content)
-        return StreamingResponse(
-            stream,
+        downloaded = await service.download_file(file_id)
+        return Response(
+            content=downloaded.content,
             media_type=downloaded.mime_type or "application/octet-stream",
             headers={"Content-Disposition": f'attachment; filename="{downloaded.filename}"'},
         )
@@ -412,5 +376,4 @@ def create_app(telegram_storage: TelegramStorage | None = None) -> FastAPI:
         session_ttl_days=settings.session_ttl_days,
         secure_cookie=settings.secure_cookie,
         sync_cooldown_seconds=settings.sync_cooldown_seconds,
-        max_upload_bytes=settings.max_upload_bytes,
     )

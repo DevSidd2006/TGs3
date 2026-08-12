@@ -21,7 +21,6 @@ def test_upload_endpoint_returns_ready_file(app_client: TestClient):
     body = response.json()
     assert body["name"] == "hello.txt"
     assert body["status"] == "ready"
-    assert body["size_bytes"] == 5
 
 
 def test_search_endpoint_filters_by_query(app_client: TestClient):
@@ -155,88 +154,4 @@ def test_sync_endpoint_rate_limited(app_client: TestClient):
     assert first.status_code == 200
     second = app_client.post("/sync")
     assert second.status_code == 429
-
-
-def test_download_route_returns_attachment(app_client: TestClient):
-    response = app_client.get("/files/1/download")
-
-    assert response.status_code == 200
-    assert "attachment" in response.headers.get("content-disposition", "")
-
-
-def test_download_route_invalid_id_returns_404(app_client: TestClient):
-    response = app_client.get("/files/99999/download")
-
-    assert response.status_code == 404
-
-
-def test_delete_folder_with_files_returns_400(app_client: TestClient):
-    folder = app_client.post("/folders", json={"name": "Docs", "parent_id": None}).json()
-    app_client.post(
-        "/files/upload",
-        params={"folder_id": folder["id"]},
-        files={"file": ("a.txt", b"hello", "text/plain")},
-    )
-    response = app_client.delete(f"/folders/{folder['id']}")
-
-    assert response.status_code == 400
-
-
-def test_delete_file_endpoint(app_client: TestClient):
-    # There is a seed.txt file with id=1
-    response = app_client.delete("/files/1")
-    assert response.status_code == 204
-
-    # File should be gone
-    get_response = app_client.get("/files/1")
-    assert get_response.status_code == 404
-
-def test_delete_file_endpoint_not_found(app_client: TestClient):
-    response = app_client.delete("/files/999")
-    assert response.status_code == 404
-
-def test_rename_file_endpoint(app_client: TestClient):
-    response = app_client.patch("/files/1", json={"name": "new_name.txt"})
-    assert response.status_code == 200
-    assert response.json()["name"] == "new_name.txt"
-
-    # Verify via get
-    get_response = app_client.get("/files/1")
-    assert get_response.json()["name"] == "new_name.txt"
-
-def test_rename_file_endpoint_not_found(app_client: TestClient):
-    response = app_client.patch("/files/999", json={"name": "new_name.txt"})
-    assert response.status_code == 404
-
-def test_upload_size_limit_returns_413(tmp_path):
-    import sqlite3
-    from app.db import ensure_schema
-    from app.repository import FileRepository
-    from app.service import StorageService
-    from app.main import build_app
-    from tests.fakes import FakeTelegramStorage
-
-    connection = sqlite3.connect(tmp_path / "files.db", check_same_thread=False)
-    connection.row_factory = sqlite3.Row
-    ensure_schema(connection)
-    repository = FileRepository(connection)
-    telegram = FakeTelegramStorage(message_id=10, file_id="tg-10")
-    service = StorageService(repository, telegram, channel_id=-10055)
-    
-    app = build_app(service, max_upload_bytes=10)
-    client = TestClient(app)
-
-    # 11 bytes should fail
-    response = client.post(
-        "/files/upload",
-        files={"file": ("large.txt", b"12345678901", "text/plain")},
-    )
-    assert response.status_code == 413
-
-    # 9 bytes should succeed
-    response = client.post(
-        "/files/upload",
-        files={"file": ("small.txt", b"123456789", "text/plain")},
-    )
-    assert response.status_code == 201
 

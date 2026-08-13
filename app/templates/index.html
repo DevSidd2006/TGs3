@@ -190,12 +190,17 @@
                 <td><span class="file-size-text">{{ file.size_bytes | format_bytes }}</span></td>
                 <td><span class="file-modified-text">{{ file.uploaded_at[:10] if file.uploaded_at else "" }}</span></td>
                 <td style="text-align: right;">
-                  <button class="action-menu-btn preview-trigger" data-id="{{ file.id }}" data-mime="{{ file.mime_type or '' }}" data-name="{{ file.name }}" title="Preview">
-                    <i class="ph-bold ph-eye"></i>
-                  </button>
-                  <button class="action-menu-btn move-trigger" data-id="{{ file.id }}" title="Move">
-                    <i class="ph-bold ph-folder-notch"></i>
-                  </button>
+                  <div class="dropdown">
+                    <button class="action-menu-btn" onclick="toggleDropdown(event, 'file-menu-{{ file.id }}')" title="More actions">
+                      <i class="ph-bold ph-dots-three-vertical"></i>
+                    </button>
+                    <div id="file-menu-{{ file.id }}" class="dropdown-content">
+                      <button class="preview-trigger" data-id="{{ file.id }}" data-mime="{{ file.mime_type or '' }}" data-name="{{ file.name }}"><i class="ph-bold ph-eye"></i> Preview</button>
+                      <button class="move-trigger" data-id="{{ file.id }}"><i class="ph-bold ph-folder-notch"></i> Move</button>
+                      <button class="share-trigger" data-id="{{ file.id }}" data-token="{{ file.share_token or '' }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-share-network"></i> Share</button>
+                      <a href="/files/{{ file.id }}/download"><i class="ph-bold ph-download-simple"></i> Download</a>
+                    </div>
+                  </div>
                 </td>
               </tr>
               {% endfor %}

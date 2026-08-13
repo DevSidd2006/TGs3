@@ -312,6 +312,19 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
             headers={"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(downloaded.filename)}"},
         )
 
+    @app.get("/s/{token}/{filename}")
+    async def direct_shared_file(request: Request, token: str, filename: str):
+        stored = service.get_shared_file(token)
+        if stored is None:
+            raise HTTPException(status_code=404, detail="file not found")
+        downloaded = await service.download_file(stored.id)
+        # We use inline so that bots/browsers can display or parse it directly
+        return Response(
+            content=downloaded.content,
+            media_type=downloaded.mime_type or "application/octet-stream",
+            headers={"Content-Disposition": f"inline; filename*=UTF-8''{urllib.parse.quote(downloaded.filename)}"},
+        )
+
     @app.get("/s/{token}/preview")
     async def preview_shared_file(request: Request, token: str):
         stored = service.get_shared_file(token)

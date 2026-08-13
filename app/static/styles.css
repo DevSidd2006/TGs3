@@ -1172,3 +1172,47 @@ body {
   animation: spin 1s linear infinite;
 }
 
+
+/* Dropdown styling */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+.dropdown-content {
+  display: none;
+  position: absolute;
+  right: 0;
+  top: 100%;
+  margin-top: 4px;
+  background-color: var(--bg-surface, #ffffff);
+  min-width: 180px;
+  box-shadow: 0px 4px 12px rgba(0,0,0,0.15);
+  border-radius: 8px;
+  border: 1px solid var(--border-color, #dadce0);
+  z-index: 100;
+  padding: 8px 0;
+}
+.dropdown-content.show {
+  display: block;
+}
+.dropdown-content a, .dropdown-content button {
+  color: var(--text-primary, #202124);
+  padding: 10px 16px;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  border: none;
+  background: none;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  font-family: inherit;
+}
+.dropdown-content a:hover, .dropdown-content button:hover {
+  background-color: rgba(0,0,0,0.04);
+}
+.dropdown-content i {
+  font-size: 18px;
+}

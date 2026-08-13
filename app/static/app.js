@@ -469,12 +469,17 @@ function closeShareModal() {
 function updateShareModalUI(token) {
   const container = document.getElementById("share-link-container");
   const input = document.getElementById("share-modal-link");
+  const aiInput = document.getElementById("share-modal-link-ai");
+  const fileName = document.getElementById("share-modal-filename").textContent;
+  
   if (token) {
     container.style.display = "block";
     input.value = window.location.origin + "/s/" + token;
+    aiInput.value = window.location.origin + "/s/" + token + "/" + encodeURIComponent(fileName);
   } else {
     container.style.display = "none";
     input.value = "";
+    aiInput.value = "";
   }
 }
 
@@ -506,6 +511,16 @@ function copyShareLink() {
   input.select();
   document.execCommand("copy");
   const btn = document.getElementById("share-modal-copy");
+  const original = btn.innerHTML;
+  btn.innerHTML = '<i class="ph-bold ph-check"></i> Copied';
+  setTimeout(() => btn.innerHTML = original, 2000);
+}
+
+function copyShareLinkAi() {
+  const input = document.getElementById("share-modal-link-ai");
+  input.select();
+  document.execCommand("copy");
+  const btn = document.getElementById("share-modal-copy-ai");
   const original = btn.innerHTML;
   btn.innerHTML = '<i class="ph-bold ph-check"></i> Copied';
   setTimeout(() => btn.innerHTML = original, 2000);
@@ -707,4 +722,31 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("share-modal-toggle")?.addEventListener("change", toggleShare);
   document.getElementById("share-modal-copy")?.addEventListener("click", copyShareLink);
+  document.getElementById("share-modal-copy-ai")?.addEventListener("click", copyShareLinkAi);
+});
+
+window.toggleDropdown = function(event, menuId) {
+  event.stopPropagation();
+  const menu = document.getElementById(menuId);
+  const isShowing = menu.classList.contains("show");
+  
+  // Close all open dropdowns
+  const dropdowns = document.getElementsByClassName("dropdown-content");
+  for (let i = 0; i < dropdowns.length; i++) {
+    dropdowns[i].classList.remove('show');
+  }
+  
+  // Toggle the clicked one
+  if (!isShowing) {
+    menu.classList.add("show");
+  }
+};
+
+window.addEventListener("click", function(event) {
+  if (!event.target.closest('.dropdown')) {
+    const dropdowns = document.getElementsByClassName("dropdown-content");
+    for (let i = 0; i < dropdowns.length; i++) {
+      dropdowns[i].classList.remove('show');
+    }
+  }
 });

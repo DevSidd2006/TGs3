@@ -1,115 +1,204 @@
 {% extends "base.html" %}
 {% block body %}
-<div class="detail-app">
-  <header class="detail-header">
-    <div class="detail-header-left">
-      <a href="/" class="drive-logo">
-        <svg class="google-drive-icon" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
-          <path d="M12 2L3.5 17h5.2L12 10.6 15.3 17h5.2L12 2z" fill="#1a73e8"/>
-          <path d="M12 10.6L8.7 17h6.6L12 10.6z" fill="#0b57d0"/>
-          <path d="M3.5 17l2.6 4.5a3 3 0 002.6 1.5h6.6c1.1 0 2.1-.6 2.6-1.5l2.6-4.5h-5.2L12 19l-3.3-2H3.5z" fill="#66b5f6"/>
-          <path d="M12 2v5.4l3.3 9.6h5.2L12 2z" fill="#4285f4"/>
-        </svg>
-        <span class="drive-title">TGS3</span>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--bg-primary, #f8f9fa);
+  }
+  .immersive-layout {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+  }
+  .immersive-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 24px;
+    background: var(--bg-surface, #ffffff);
+    border-bottom: 1px solid var(--border-color, #dadce0);
+    z-index: 10;
+  }
+  .immersive-header .left {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .immersive-header .back-btn {
+    color: var(--text-primary, #202124);
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    transition: background 0.2s;
+  }
+  .immersive-header .back-btn:hover {
+    background: rgba(0,0,0,0.04);
+  }
+  .immersive-header .file-name {
+    font-size: 18px;
+    font-weight: 500;
+    color: var(--text-primary, #202124);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 400px;
+  }
+  
+  .immersive-header .right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  
+  .immersive-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-primary, #f8f9fa);
+    overflow: hidden;
+    position: relative;
+  }
+  
+  .immersive-content iframe,
+  .immersive-content img,
+  .immersive-content video {
+    width: 100%;
+    height: 100%;
+    border: none;
+  }
+  
+  .immersive-content img {
+    object-fit: contain;
+  }
+  
+  /* Dropdown styling */
+  .dropdown {
+    position: relative;
+    display: inline-block;
+  }
+  .dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    top: 48px;
+    background-color: var(--bg-surface, #ffffff);
+    min-width: 200px;
+    box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    border: 1px solid var(--border-color, #dadce0);
+    z-index: 20;
+    padding: 8px 0;
+  }
+  .dropdown-content.show {
+    display: block;
+  }
+  .dropdown-content a, .dropdown-content button {
+    color: var(--text-primary, #202124);
+    padding: 12px 16px;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    border: none;
+    background: none;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  .dropdown-content a:hover, .dropdown-content button:hover {
+    background-color: rgba(0,0,0,0.04);
+  }
+  .dropdown-content i {
+    font-size: 18px;
+  }
+</style>
+
+<div class="immersive-layout">
+  <header class="immersive-header">
+    <div class="left">
+      <a href="/" class="back-btn" title="Back to All Files">
+        <i class="ph-bold ph-arrow-left" style="font-size: 20px;"></i>
       </a>
+      <span class="file-name">{{ file.name }}</span>
     </div>
-    <div class="detail-header-right">
-      <button class="icon-btn" id="theme-toggle-btn" title="Toggle theme (Light / Dark)"><i class="ph-bold ph-moon" id="theme-toggle-icon"></i></button>
+    <div class="right">
+      <div class="dropdown">
+        <button class="icon-btn" onclick="toggleImmersiveMenu()" title="More actions">
+          <i class="ph-bold ph-list"></i>
+        </button>
+        <div id="immersiveMenu" class="dropdown-content">
+          {% if file.status == 'ready' %}
+            <a href="/files/{{ file.id }}/download"><i class="ph-bold ph-download-simple"></i> Download</a>
+            <button onclick="openShareModal('{{ file.id }}', '{{ file.share_token or '' }}', '{{ file.name | escape }}')"><i class="ph-bold ph-share-network"></i> Share</button>
+          {% else %}
+            <button disabled style="opacity: 0.5;"><i class="ph-bold ph-clock"></i> Processing...</button>
+          {% endif %}
+          <div style="height: 1px; background: var(--border-color, #dadce0); margin: 8px 0;"></div>
+          <button id="theme-toggle-btn-immersive"><i class="ph-bold ph-moon"></i> Toggle Theme</button>
+        </div>
+      </div>
     </div>
   </header>
 
-  <div class="detail-main">
-    <a href="/" class="back-link">
-      <i class="ph-bold ph-arrow-left"></i> All Files
-    </a>
-
-    <div class="detail-file-card">
-      <div class="detail-icon-box">
-        <i class="ph-fill ph-file-text"></i>
-      </div>
-      <div class="detail-title-group">
-        <h1>{{ file.name }}</h1>
-        <div class="detail-meta-line">
-          <span class="file-size-text">{{ file.size_bytes | format_bytes }}</span>
-          <span class="meta-sep">&bull;</span>
-          <span class="file-modified-text">{{ file.uploaded_at[:10] if file.uploaded_at else "Recently" }}</span>
-        </div>
-      </div>
-      <span class="status-badge status-{{ file.status }}">
-        <i class="ph-bold {% if file.status == 'ready' %}ph-check-circle{% elif file.status == 'uploading' %}ph-spinner-gap spin{% else %}ph-x-circle{% endif %}"></i>
-        {{ file.status }}
-      </span>
-    </div>
-
+  <div class="immersive-content">
     {% if file.status == 'ready' %}
-    <div class="detail-preview" id="detail-preview">
       {% if file.mime_type and file.mime_type.startswith('video/') %}
-        <video controls class="preview-frame" style="background: black;">
+        <video controls>
           <source src="/files/{{ file.id }}/preview" type="{{ file.mime_type }}">
           Your browser does not support the video tag.
         </video>
       {% elif file.mime_type and file.mime_type.startswith('audio/') %}
-        <audio controls class="preview-frame" style="height: 54px; padding: 20px; background: transparent; width: 100%;">
+        <audio controls style="width: 80%;">
           <source src="/files/{{ file.id }}/preview" type="{{ file.mime_type }}">
           Your browser does not support the audio element.
         </audio>
       {% elif file.mime_type and file.mime_type.startswith('image/') %}
-        <img src="/files/{{ file.id }}/preview" class="preview-frame" style="object-fit: contain;" alt="Image preview" />
+        <img src="/files/{{ file.id }}/preview" alt="Image preview" />
       {% else %}
-        <iframe class="preview-frame" src="/files/{{ file.id }}/preview" title="Preview" loading="lazy"></iframe>
+        <iframe src="/files/{{ file.id }}/preview" title="Preview" loading="lazy"></iframe>
       {% endif %}
-    </div>
+    {% else %}
+       <div style="text-align: center; color: var(--text-secondary);">
+         <i class="ph-bold ph-spinner-gap spin" style="font-size: 32px;"></i>
+         <p style="margin-top: 16px;">File is processing...</p>
+       </div>
     {% endif %}
-
-    <div class="detail-grid">
-      <div class="detail-card">
-        <label>File ID</label>
-        <span>#{{ file.id }}</span>
-      </div>
-      <div class="detail-card">
-        <label>File Size</label>
-        <span>{{ file.size_bytes | format_bytes }}</span>
-      </div>
-      <div class="detail-card">
-        <label>MIME Type</label>
-        <span>{{ file.mime_type or "unknown" }}</span>
-      </div>
-      <div class="detail-card">
-        <label>Uploaded At</label>
-        <span>{{ file.uploaded_at[:10] if file.uploaded_at else "Recently" }}</span>
-      </div>
-    </div>
-
-    <div class="detail-actions">
-      {% if file.status == 'ready' %}
-      <a href="/files/{{ file.id }}/download" class="btn-download-primary">
-        <i class="ph-bold ph-download-simple"></i> Download
-      </a>
-      <button class="btn-download-secondary" onclick="openShareModal('{{ file.id }}', '{{ file.share_token or '' }}', '{{ file.name | escape }}')">
-        <i class="ph-bold ph-share-network"></i> Share
-      </button>
-      <button id="btn-close-preview" class="btn-download-secondary" onclick="toggleDetailPreview()">
-        <i class="ph-bold ph-eye-slash"></i> Hide preview
-      </button>
-      {% else %}
-      <button class="btn-download-primary" disabled style="opacity: 0.5; cursor: not-allowed;">
-        <i class="ph-bold ph-clock"></i> File is processing...
-      </button>
-      {% endif %}
-    </div>
   </div>
 </div>
 
 <script>
-  function toggleDetailPreview() {
-    const preview = document.getElementById("detail-preview");
-    const btn = document.getElementById("btn-close-preview");
-    if (!preview || !btn) return;
-    const hidden = preview.style.display === "none";
-    preview.style.display = hidden ? "" : "none";
-    btn.innerHTML = hidden
-      ? '<i class="ph-bold ph-eye-slash"></i> Hide preview'
-      : '<i class="ph-bold ph-eye"></i> Show preview';
+  function toggleImmersiveMenu() {
+    document.getElementById("immersiveMenu").classList.toggle("show");
   }
+
+  // Close the dropdown if the user clicks outside of it
+  window.onclick = function(event) {
+    if (!event.target.closest('.icon-btn') && !event.target.closest('.dropdown-content') && !event.target.closest('.modal-card')) {
+      var dropdowns = document.getElementsByClassName("dropdown-content");
+      for (var i = 0; i < dropdowns.length; i++) {
+        var openDropdown = dropdowns[i];
+        if (openDropdown.classList.contains('show')) {
+          openDropdown.classList.remove('show');
+        }
+      }
+    }
+  }
+
+  // Hook up theme toggle
+  document.getElementById('theme-toggle-btn-immersive').addEventListener('click', function() {
+    const currentTheme = document.documentElement.getAttribute("data-theme");
+    const newTheme = currentTheme === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+  });
 </script>
 {% endblock %}

@@ -30,9 +30,15 @@
           </div>
           <div id="share-link-container" style="display: none;">
             <p style="margin-top: 0; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary);">Anyone with the link can view and download this file.</p>
+            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+              <input type="text" id="share-modal-link" class="modal-input" readonly style="margin-bottom: 0;" title="Standard share link">
+              <button id="share-modal-copy" class="btn-solid-blue" style="white-space: nowrap;" title="Copy Standard Link"><i class="ph-bold ph-copy"></i> Copy</button>
+            </div>
+            
+            <p style="margin-top: 12px; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary);">Direct File Link (For ChatGPT / AI bots):</p>
             <div style="display: flex; gap: 8px;">
-              <input type="text" id="share-modal-link" class="modal-input" readonly style="margin-bottom: 0;">
-              <button id="share-modal-copy" class="btn-solid-blue" style="white-space: nowrap;"><i class="ph-bold ph-copy"></i> Copy</button>
+              <input type="text" id="share-modal-link-ai" class="modal-input" readonly style="margin-bottom: 0;" title="Direct AI link">
+              <button id="share-modal-copy-ai" class="btn-solid-blue" style="white-space: nowrap;" title="Copy AI Link"><i class="ph-bold ph-copy"></i> Copy</button>
             </div>
           </div>
         </div>

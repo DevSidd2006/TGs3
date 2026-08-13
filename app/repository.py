@@ -162,6 +162,20 @@ class FileRepository:
         chain.reverse()
         return chain
 
+    def set_share_token(self, file_id: int, enable: bool) -> str | None:
+        if enable:
+            token = secrets.token_urlsafe(16)
+            self._connection.execute("UPDATE files SET share_token = ? WHERE id = ?", (token, file_id))
+        else:
+            token = None
+            self._connection.execute("UPDATE files SET share_token = NULL WHERE id = ?", (file_id,))
+        self._connection.commit()
+        return token
+
+    def get_file_by_share_token(self, token: str) -> StoredFile | None:
+        row = self._connection.execute("SELECT * FROM files WHERE share_token = ?", (token,)).fetchone()
+        return None if row is None else self._row_to_model(row)
+
     def _row_to_model(self, row: sqlite3.Row) -> StoredFile:
         return StoredFile(
             id=row["id"],
@@ -173,7 +187,8 @@ class FileRepository:
             telegram_file_id=row["telegram_file_id"],
             status=row["status"],
             uploaded_at=datetime.fromisoformat(row["uploaded_at"]),
-            folder_id=row["folder_id"],
+            folder_id=row["folder_id"] if "folder_id" in row.keys() else None,
+            share_token=row["share_token"] if "share_token" in row.keys() else None,
         )
 
 
@@ -203,7 +218,14 @@ class AuthRepository:
         ).fetchone()
         return None if row is None else row["password_hash"]
 
+    def cleanup_expired_sessions(self) -> int:
+        now = datetime.utcnow().isoformat()
+        cursor = self._connection.execute("DELETE FROM sessions WHERE expires_at < ?", (now,))
+        self._connection.commit()
+        return cursor.rowcount
+
     def create_session(self, *, username: str, ttl: timedelta) -> str:
+        self.cleanup_expired_sessions()
         token = secrets.token_urlsafe(32)
         expires = (datetime.utcnow() + ttl).isoformat()
         self._connection.execute(

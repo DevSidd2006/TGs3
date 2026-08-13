@@ -155,3 +155,32 @@ def test_sync_endpoint_rate_limited(app_client: TestClient):
     second = app_client.post("/sync")
     assert second.status_code == 429
 
+def test_share_endpoints(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("share_me.txt", b"secret data", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    res = app_client.post(f"/files/{file_id}/share", json={"enabled": True})
+    assert res.status_code == 200
+    token = res.json()["share_token"]
+    assert token is not None
+
+    # Public download
+    # To test without auth, we can just clear cookies but app_client in this test fixture 
+    # automatically authenticates. However, the /s/ endpoints don't check auth.
+    dl_res = app_client.get(f"/s/{token}/download")
+    assert dl_res.status_code == 200
+    assert dl_res.content == b"downloaded"
+
+    # Public preview
+    pr_res = app_client.get(f"/s/{token}/preview")
+    assert pr_res.status_code == 200
+    assert pr_res.content == b"downloaded"
+
+    # Turn off sharing
+    app_client.post(f"/files/{file_id}/share", json={"enabled": False})
+    dl_res_off = app_client.get(f"/s/{token}/download")
+    assert dl_res_off.status_code == 404
+

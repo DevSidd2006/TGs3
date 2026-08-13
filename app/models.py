@@ -14,6 +14,7 @@ class StoredFile:
     status: str
     uploaded_at: datetime
     folder_id: int | None = None
+    share_token: str | None = None
 
 
 @dataclass(frozen=True)

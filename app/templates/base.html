@@ -12,6 +12,33 @@
   </head>
   <body>
     {% block body %}{% endblock %}
-    <script src="/static/app.js?v=10"></script>
+    
+    <!-- Share Modal -->
+    <div id="share-modal" class="preview-overlay" hidden>
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title">Share "<span id="share-modal-filename"></span>"</span>
+          <button id="share-modal-close" class="icon-btn" title="Close"><i class="ph-bold ph-x"></i></button>
+        </div>
+        <div class="modal-body">
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+            <label style="font-weight: 500;">Public Sharing</label>
+            <label class="switch">
+              <input type="checkbox" id="share-modal-toggle">
+              <span class="slider round"></span>
+            </label>
+          </div>
+          <div id="share-link-container" style="display: none;">
+            <p style="margin-top: 0; margin-bottom: 8px; font-size: 13px; color: var(--text-secondary);">Anyone with the link can view and download this file.</p>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" id="share-modal-link" class="modal-input" readonly style="margin-bottom: 0;">
+              <button id="share-modal-copy" class="btn-solid-blue" style="white-space: nowrap;"><i class="ph-bold ph-copy"></i> Copy</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <script src="/static/app.js?v=11"></script>
   </body>
 </html>

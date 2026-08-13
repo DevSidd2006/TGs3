@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block body %}
+<div class="detail-app">
+  <header class="detail-header">
+    <div class="detail-header-left">
+      <a href="/s/{{ token }}" class="drive-logo">
+        <svg class="google-drive-icon" viewBox="0 0 24 24" width="34" height="34" aria-hidden="true">
+          <path d="M12 2L3.5 17h5.2L12 10.6 15.3 17h5.2L12 2z" fill="#1a73e8"/>
+          <path d="M12 10.6L8.7 17h6.6L12 10.6z" fill="#0b57d0"/>
+          <path d="M3.5 17l2.6 4.5a3 3 0 002.6 1.5h6.6c1.1 0 2.1-.6 2.6-1.5l2.6-4.5h-5.2L12 19l-3.3-2H3.5z" fill="#66b5f6"/>
+          <path d="M12 2v5.4l3.3 9.6h5.2L12 2z" fill="#4285f4"/>
+        </svg>
+        <span class="drive-title">TGS3 Shared File</span>
+      </a>
+    </div>
+    <div class="detail-header-right">
+      <button class="icon-btn" id="theme-toggle-btn" title="Toggle theme (Light / Dark)"><i class="ph-bold ph-moon" id="theme-toggle-icon"></i></button>
+    </div>
+  </header>
+
+  <div class="detail-main">
+    <div class="detail-file-card">
+      <div class="detail-icon-box">
+        <i class="ph-fill ph-file-text"></i>
+      </div>
+      <div class="detail-title-group">
+        <h1>{{ file.name }}</h1>
+        <div class="detail-meta-line">
+          <span class="file-size-text">{{ file.size_bytes | format_bytes }}</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="detail-preview" id="detail-preview">
+      {% if file.mime_type and file.mime_type.startswith('video/') %}
+        <video controls class="preview-frame" style="background: black;">
+          <source src="/s/{{ token }}/preview" type="{{ file.mime_type }}">
+          Your browser does not support the video tag.
+        </video>
+      {% elif file.mime_type and file.mime_type.startswith('audio/') %}
+        <audio controls class="preview-frame" style="height: 54px; padding: 20px; background: transparent; width: 100%;">
+          <source src="/s/{{ token }}/preview" type="{{ file.mime_type }}">
+          Your browser does not support the audio element.
+        </audio>
+      {% elif file.mime_type and file.mime_type.startswith('image/') %}
+        <img src="/s/{{ token }}/preview" class="preview-frame" style="object-fit: contain;" alt="Image preview" />
+      {% else %}
+        <iframe class="preview-frame" src="/s/{{ token }}/preview" title="Preview" loading="lazy"></iframe>
+      {% endif %}
+    </div>
+
+    <div class="detail-actions" style="margin-top: 24px;">
+      <a href="/s/{{ token }}/download" class="btn-download-primary">
+        <i class="ph-bold ph-download-simple"></i> Download
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

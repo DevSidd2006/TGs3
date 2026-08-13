@@ -43,7 +43,21 @@
 
     {% if file.status == 'ready' %}
     <div class="detail-preview" id="detail-preview">
-      <iframe class="preview-frame" src="/files/{{ file.id }}/preview" title="Preview" loading="lazy"></iframe>
+      {% if file.mime_type and file.mime_type.startswith('video/') %}
+        <video controls class="preview-frame" style="background: black;">
+          <source src="/files/{{ file.id }}/preview" type="{{ file.mime_type }}">
+          Your browser does not support the video tag.
+        </video>
+      {% elif file.mime_type and file.mime_type.startswith('audio/') %}
+        <audio controls class="preview-frame" style="height: 54px; padding: 20px; background: transparent; width: 100%;">
+          <source src="/files/{{ file.id }}/preview" type="{{ file.mime_type }}">
+          Your browser does not support the audio element.
+        </audio>
+      {% elif file.mime_type and file.mime_type.startswith('image/') %}
+        <img src="/files/{{ file.id }}/preview" class="preview-frame" style="object-fit: contain;" alt="Image preview" />
+      {% else %}
+        <iframe class="preview-frame" src="/files/{{ file.id }}/preview" title="Preview" loading="lazy"></iframe>
+      {% endif %}
     </div>
     {% endif %}
 
@@ -71,6 +85,9 @@
       <a href="/files/{{ file.id }}/download" class="btn-download-primary">
         <i class="ph-bold ph-download-simple"></i> Download
       </a>
+      <button class="btn-download-secondary" onclick="openShareModal('{{ file.id }}', '{{ file.share_token or '' }}', '{{ file.name | escape }}')">
+        <i class="ph-bold ph-share-network"></i> Share
+      </button>
       <button id="btn-close-preview" class="btn-download-secondary" onclick="toggleDetailPreview()">
         <i class="ph-bold ph-eye-slash"></i> Hide preview
       </button>

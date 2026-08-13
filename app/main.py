@@ -1,5 +1,6 @@
 import os
 import time
+import urllib.parse
 from contextlib import asynccontextmanager
 from datetime import timedelta
 from pathlib import Path
@@ -31,6 +32,7 @@ def serialize_file(stored) -> dict:
         "status": stored.status,
         "uploaded_at": stored.uploaded_at.isoformat(),
         "folder_id": getattr(stored, "folder_id", None),
+        "share_token": getattr(stored, "share_token", None),
     }
 
 
@@ -256,7 +258,7 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return Response(
             content=downloaded.content,
             media_type=downloaded.mime_type or "application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{downloaded.filename}"'},
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(downloaded.filename)}"},
         )
 
     @app.get("/files/{file_id}/preview")
@@ -275,7 +277,57 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return Response(
             content=preview.content,
             media_type=preview.mime_type or "application/octet-stream",
-            headers={"Content-Disposition": f'inline; filename="{preview.filename}"'},
+            headers={"Content-Disposition": f"inline; filename*=UTF-8''{urllib.parse.quote(preview.filename)}"},
+        )
+
+    @app.post("/files/{file_id}/share")
+    def share_file(request: Request, file_id: int, payload: dict):
+        require_auth_route(request)
+        try:
+            stored = service.toggle_share(file_id, payload.get("enabled", False))
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return serialize_file(stored)
+
+    @app.get("/s/{token}", response_class=HTMLResponse)
+    def shared_file_page(request: Request, token: str):
+        stored = service.get_shared_file(token)
+        if stored is None:
+            raise HTTPException(status_code=404, detail="file not found")
+        return templates.TemplateResponse(
+            request,
+            "shared_file.html",
+            {"file": serialize_file(stored), "token": token},
+        )
+
+    @app.get("/s/{token}/download")
+    async def download_shared_file(request: Request, token: str):
+        stored = service.get_shared_file(token)
+        if stored is None:
+            raise HTTPException(status_code=404, detail="file not found")
+        downloaded = await service.download_file(stored.id)
+        return Response(
+            content=downloaded.content,
+            media_type=downloaded.mime_type or "application/octet-stream",
+            headers={"Content-Disposition": f"attachment; filename*=UTF-8''{urllib.parse.quote(downloaded.filename)}"},
+        )
+
+    @app.get("/s/{token}/preview")
+    async def preview_shared_file(request: Request, token: str):
+        stored = service.get_shared_file(token)
+        if stored is None:
+            raise HTTPException(status_code=404, detail="file not found")
+        try:
+            downloaded = await service.download_file(stored.id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        preview = renderer.render(file_id=stored.id, downloaded=downloaded)
+        if preview is None:
+            raise HTTPException(status_code=415, detail="no preview available for this file type")
+        return Response(
+            content=preview.content,
+            media_type=preview.mime_type or "application/octet-stream",
+            headers={"Content-Disposition": f"inline; filename*=UTF-8''{urllib.parse.quote(preview.filename)}"},
         )
 
     @app.post("/sync")

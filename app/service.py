@@ -60,6 +60,16 @@ class StorageService:
     def get_file(self, file_id: int):
         return self._repository.get_file(file_id)
 
+    def toggle_share(self, file_id: int, enable: bool):
+        self._repository.set_share_token(file_id, enable)
+        stored = self._repository.get_file(file_id)
+        if stored is None:
+            raise FileNotFoundError(f"File {file_id} not found")
+        return stored
+
+    def get_shared_file(self, token: str):
+        return self._repository.get_file_by_share_token(token)
+
     async def download_file(self, file_id: int) -> DownloadedTelegramFile:
         stored = self._repository.get_file(file_id)
         if stored is None or stored.telegram_message_id is None:

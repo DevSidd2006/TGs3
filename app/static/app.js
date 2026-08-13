@@ -130,6 +130,9 @@ function renderFileList() {
           <td><span class="file-size-text">${formatBytes(file.size_bytes)}</span></td>
           <td><span class="file-modified-text">${formatDate(file.uploaded_at)}</span></td>
           <td style="text-align: right;">
+            <button class="action-menu-btn share-trigger" data-id="${file.id}" data-token="${file.share_token || ''}" data-name="${file.name}" title="Share">
+              <i class="ph-bold ph-share-network"></i>
+            </button>
             <button class="action-menu-btn preview-trigger" data-id="${file.id}" data-mime="${file.mime_type || ''}" data-name="${file.name}" title="Preview">
               <i class="ph-bold ph-eye"></i>
             </button>
@@ -167,6 +170,9 @@ function renderFileList() {
             <div class="file-type-icon ${badge.class}">
               <i class="ph-fill ${badge.icon}"></i>
             </div>
+            <button class="action-menu-btn share-trigger" data-id="${file.id}" data-token="${file.share_token || ''}" data-name="${file.name}" title="Share" onclick="event.stopPropagation();">
+              <i class="ph-bold ph-share-network"></i>
+            </button>
             <button class="action-menu-btn preview-trigger" data-id="${file.id}" data-mime="${file.mime_type || ''}" data-name="${file.name}" onclick="event.stopPropagation();">
               <i class="ph-bold ph-dots-three-vertical"></i>
             </button>
@@ -444,6 +450,67 @@ function folderActionMenu(folderId, folderName) {
   }
 }
 
+let shareFileId = null;
+
+function openShareModal(fileId, shareToken, fileName) {
+  shareFileId = fileId;
+  document.getElementById("share-modal-filename").textContent = fileName;
+  const toggle = document.getElementById("share-modal-toggle");
+  toggle.checked = !!shareToken;
+  updateShareModalUI(shareToken);
+  document.getElementById("share-modal").hidden = false;
+}
+
+function closeShareModal() {
+  document.getElementById("share-modal").hidden = true;
+  shareFileId = null;
+}
+
+function updateShareModalUI(token) {
+  const container = document.getElementById("share-link-container");
+  const input = document.getElementById("share-modal-link");
+  if (token) {
+    container.style.display = "block";
+    input.value = window.location.origin + "/s/" + token;
+  } else {
+    container.style.display = "none";
+    input.value = "";
+  }
+}
+
+async function toggleShare() {
+  if (!shareFileId) return;
+  const enable = document.getElementById("share-modal-toggle").checked;
+  const res = await fetch(`/files/${shareFileId}/share`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ enabled: enable }),
+  });
+  if (res.ok) {
+    const file = await res.json();
+    updateShareModalUI(file.share_token);
+    // Update local cache if available
+    if (typeof allFilesCache !== 'undefined') {
+      const idx = allFilesCache.findIndex(f => f.id === file.id);
+      if (idx >= 0) allFilesCache[idx] = file;
+      if (typeof renderFileList === 'function') renderFileList();
+    }
+  } else {
+    alert("Failed to update share settings.");
+    document.getElementById("share-modal-toggle").checked = !enable; // revert
+  }
+}
+
+function copyShareLink() {
+  const input = document.getElementById("share-modal-link");
+  input.select();
+  document.execCommand("copy");
+  const btn = document.getElementById("share-modal-copy");
+  const original = btn.innerHTML;
+  btn.innerHTML = '<i class="ph-bold ph-check"></i> Copied';
+  setTimeout(() => btn.innerHTML = original, 2000);
+}
+
 function initTheme() {
   const savedTheme = localStorage.getItem('drive_theme') || 'light';
   applyTheme(savedTheme);
@@ -584,6 +651,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (trigger) return openPreview(trigger.dataset.id, trigger.dataset.name, trigger.dataset.mime);
     const move = e.target.closest(".move-trigger");
     if (move) return openMoveModal(move.dataset.id);
+    const share = e.target.closest(".share-trigger");
+    if (share) return openShareModal(share.dataset.id, share.dataset.token, share.dataset.name);
   });
 
   const foldersGrid = document.getElementById("folders-grid-container");
@@ -631,4 +700,11 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape") closePreview();
   });
+
+  document.getElementById("share-modal-close")?.addEventListener("click", closeShareModal);
+  document.getElementById("share-modal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeShareModal();
+  });
+  document.getElementById("share-modal-toggle")?.addEventListener("change", toggleShare);
+  document.getElementById("share-modal-copy")?.addEventListener("click", copyShareLink);
 });

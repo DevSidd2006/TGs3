@@ -20,4 +20,3 @@ services:
 
       - key: TELEGRAM_SESSION
         value: "/app/.data/telegram.session"
-

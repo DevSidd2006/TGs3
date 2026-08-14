@@ -4,12 +4,21 @@
   <form method="post" action="/login" class="login-card">
     <input type="hidden" name="next" value="{{ next }}">
     <div class="login-brand">
+      <svg class="google-drive-icon" viewBox="0 0 24 24" width="40" height="40" aria-hidden="true">
+        <path d="M12 2L3.5 17h5.2L12 10.6 15.3 17h5.2L12 2z" fill="#1a73e8"/>
+        <path d="M12 10.6L8.7 17h6.6L12 10.6z" fill="#0b57d0"/>
+        <path d="M3.5 17l2.6 4.5a3 3 0 002.6 1.5h6.6c1.1 0 2.1-.6 2.6-1.5l2.6-4.5h-5.2L12 19l-3.3-2H3.5z" fill="#66b5f6"/>
+        <path d="M12 2v5.4l3.3 9.6h5.2L12 2z" fill="#4285f4"/>
+      </svg>
       <span class="drive-title">TGS3</span>
     </div>
     <h1>Sign in</h1>
-    {% if error %}<div class="login-error">{{ error }}</div>{% endif %}
-    <input class="login-input" type="text" name="username" placeholder="Username" autocomplete="username" required>
-    <input class="login-input" type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+    <p class="login-subtitle">to continue to TGS3</p>
+    {% if error %}<div class="login-error"><i class="ph-bold ph-warning-circle"></i> {{ error }}</div>{% endif %}
+    <label class="sr-only" for="login-username">Username</label>
+    <input id="login-username" class="login-input" type="text" name="username" placeholder="Username" autocomplete="username" autofocus required>
+    <label class="sr-only" for="login-password">Password</label>
+    <input id="login-password" class="login-input" type="password" name="password" placeholder="Password" autocomplete="current-password" required>
     <button class="login-submit" type="submit">Sign in</button>
   </form>
 </div>

@@ -122,7 +122,7 @@
                 {{ crumb.name }}
               {% endfor %}
             {% else %}
-              Welcome to TGS3
+              My Drive
             {% endif %}
           </h1>
         </div>
@@ -136,18 +136,6 @@
           {% endfor %}
         </div>
       </div>
-
-      {% if current_view == 'home' %}
-      <!-- Drop Zone Container (Drag & Drop files) -->
-      <div id="drop-zone" class="drag-drop-banner">
-        <div class="drop-content">
-          <i class="ph-bold ph-cloud-arrow-up"></i>
-          <span>Drag and drop files here to upload to TGS3</span>
-        </div>
-        <input id="file-input-drop" type="file" multiple style="display: none;">
-        <input id="folder-input-drop" type="file" webkitdirectory multiple style="display: none;">
-      </div>
-      {% endif %}
 
       <!-- Folders Section -->
       <section class="drive-section" id="folders-section"{{ ' hidden' if not subfolders and current_view != 'home' }}>
@@ -197,6 +185,24 @@
             {% if current_view == 'trash' %}
             <button class="btn-flat" id="btn-empty-trash" title="Permanently delete everything in Trash"><i class="ph-bold ph-trash"></i> Empty trash</button>
             {% endif %}
+            <!-- Sort Control -->
+            <div class="sort-control">
+              <div class="dropdown">
+                <button class="sort-dropdown-btn" id="sort-field-btn" type="button">
+                  <span id="sort-field-label">Name</span>
+                  <i class="ph-bold ph-caret-down"></i>
+                </button>
+                <div id="sort-field-menu" class="dropdown-content">
+                  <button type="button" class="sort-option" data-field="name">Name</button>
+                  <button type="button" class="sort-option" data-field="date">Last modified</button>
+                  <button type="button" class="sort-option" data-field="size">File size</button>
+                  <button type="button" class="sort-option" data-field="type">Type</button>
+                </div>
+              </div>
+              <button class="icon-btn-sm" id="sort-direction-btn" title="Reverse sort order">
+                <i class="ph-bold ph-sort-ascending" id="sort-direction-icon"></i>
+              </button>
+            </div>
             <!-- View Mode & Action Toggle Group -->
             <div class="view-toggle-pill-group">
               <button class="toggle-pill-btn active" id="btn-view-list" title="List view" onclick="setViewMode('list')">
@@ -232,9 +238,9 @@
             <thead>
               <tr>
                 <th class="col-select"><input type="checkbox" id="select-all-checkbox" title="Select all"></th>
-                <th class="col-name" onclick="toggleSort('name')">Name <i class="ph-bold ph-caret-down"></i></th>
-                <th class="col-size">Size</th>
-                <th class="col-modified">Modified</th>
+                <th class="col-name sortable" onclick="toggleSort('name')">Name <i class="ph-bold ph-caret-down"></i></th>
+                <th class="col-size sortable" onclick="toggleSort('size')">Size</th>
+                <th class="col-modified sortable" onclick="toggleSort('date')">Modified</th>
                 <th class="col-actions"></th>
               </tr>
             </thead>
@@ -285,6 +291,16 @@
 
 <!-- Right-click Context Menu -->
 <div id="context-menu" class="dropdown-content context-menu" hidden></div>
+
+{% if current_view == 'home' %}
+<!-- Drag-to-upload overlay (shown only while a file is dragged over the window) -->
+<div id="drag-overlay" class="drag-overlay" hidden>
+  <div class="drag-overlay-content">
+    <i class="ph-bold ph-cloud-arrow-up"></i>
+    <span>Drop files to upload to TGS3</span>
+  </div>
+</div>
+{% endif %}
 
 <!-- Folder Modal (Create/Rename) -->
 <div id="folder-modal" class="preview-overlay" hidden>

@@ -1,5 +1,7 @@
 let allFilesCache = [];
-let currentSort = 'name-asc';
+let currentSort = { field: 'name', dir: 'asc' }; // field: 'name' | 'size' | 'date' | 'type'
+const SORT_DEFAULT_DIR = { name: 'asc', size: 'desc', date: 'desc', type: 'asc' };
+const SORT_LABELS = { name: 'Name', size: 'File size', date: 'Last modified', type: 'Type' };
 let viewMode = 'list'; // 'list' or 'grid'
 let currentFolderId = null;
 let currentView = 'home'; // 'home' | 'starred' | 'shared' | 'recent' | 'trash'
@@ -29,24 +31,31 @@ function getDriveBadgeDetails(mimeType, filename = '') {
   const name = filename.toLowerCase();
 
   if (mime.includes('spreadsheet') || name.endsWith('.xlsx') || name.endsWith('.csv')) {
-    return { class: 'icon-sheet', icon: 'ph-file-xls' };
+    return { class: 'icon-sheet', icon: 'ph-file-xls', type: 'Spreadsheet' };
   }
   if (mime.includes('ipynb') || name.endsWith('.py') || name.endsWith('.ipynb')) {
-    return { class: 'icon-code', icon: 'ph-code-simple' };
+    return { class: 'icon-code', icon: 'ph-code-simple', type: 'Code' };
   }
   if (mime.includes('pdf') || name.endsWith('.pdf')) {
-    return { class: 'icon-pdf', icon: 'ph-file-pdf' };
+    return { class: 'icon-pdf', icon: 'ph-file-pdf', type: 'PDF' };
   }
   if (mime.startsWith('image/') || name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg')) {
-    return { class: 'icon-img', icon: 'ph-image' };
+    return { class: 'icon-img', icon: 'ph-image', type: 'Image' };
   }
   if (mime.startsWith('video/') || name.endsWith('.mp4')) {
-    return { class: 'icon-video', icon: 'ph-video-camera' };
+    return { class: 'icon-video', icon: 'ph-video-camera', type: 'Video' };
+  }
+  if (mime.startsWith('audio/') || name.endsWith('.mp3') || name.endsWith('.wav')) {
+    return { class: 'icon-audio', icon: 'ph-music-notes', type: 'Audio' };
   }
   if (mime.includes('zip') || name.endsWith('.zip')) {
-    return { class: 'icon-zip', icon: 'ph-file-zip' };
+    return { class: 'icon-zip', icon: 'ph-file-zip', type: 'Archive' };
   }
-  return { class: 'icon-doc', icon: 'ph-file-text' };
+  return { class: 'icon-doc', icon: 'ph-file-text', type: 'Document' };
+}
+
+function getFileTypeLabel(file) {
+  return getDriveBadgeDetails(file.mime_type, file.name).type;
 }
 
 function formatDate(iso) {
@@ -77,20 +86,44 @@ function setViewMode(mode) {
 }
 
 function toggleSort(field) {
-  if (field === 'name') {
-    currentSort = currentSort === 'name-asc' ? 'name-desc' : 'name-asc';
-  } else if (field === 'date') {
-    currentSort = currentSort === 'date-desc' ? 'date-asc' : 'date-desc';
+  if (currentSort.field === field) {
+    currentSort = { field, dir: currentSort.dir === 'asc' ? 'desc' : 'asc' };
+  } else {
+    currentSort = { field, dir: SORT_DEFAULT_DIR[field] || 'asc' };
   }
   renderFileList();
 }
 
+function setSortDirection(dir) {
+  currentSort = { ...currentSort, dir };
+  renderFileList();
+}
+
 function sortFiles(files) {
+  const { field, dir } = currentSort;
+  const sign = dir === 'asc' ? 1 : -1;
   return [...files].sort((a, b) => {
-    if (currentSort === 'name-asc') return a.name.localeCompare(b.name);
-    if (currentSort === 'name-desc') return b.name.localeCompare(a.name);
-    return 0;
+    if (field === 'size') return sign * ((a.size_bytes || 0) - (b.size_bytes || 0));
+    if (field === 'date') return sign * (new Date(a.uploaded_at) - new Date(b.uploaded_at));
+    if (field === 'type') {
+      const cmp = getFileTypeLabel(a).localeCompare(getFileTypeLabel(b));
+      return cmp !== 0 ? sign * cmp : a.name.localeCompare(b.name);
+    }
+    return sign * a.name.localeCompare(b.name);
   });
+}
+
+function sortCaretHtml(field) {
+  if (currentSort.field !== field) return "";
+  const icon = currentSort.dir === 'asc' ? 'ph-caret-up' : 'ph-caret-down';
+  return `<i class="ph-bold ${icon}"></i>`;
+}
+
+function updateSortControlsUI() {
+  const label = document.getElementById('sort-field-label');
+  if (label) label.textContent = SORT_LABELS[currentSort.field] || 'Name';
+  const dirIcon = document.getElementById('sort-direction-icon');
+  if (dirIcon) dirIcon.className = `ph-bold ${currentSort.dir === 'asc' ? 'ph-sort-ascending' : 'ph-sort-descending'}`;
 }
 
 function buildFileActionsMenu(file) {
@@ -178,9 +211,9 @@ function renderFileList() {
         <thead>
           <tr>
             <th class="col-select"><input type="checkbox" id="select-all-checkbox"></th>
-            <th class="col-name" onclick="toggleSort('name')">Name <i class="ph-bold ph-caret-down"></i></th>
-            <th class="col-size">Size</th>
-            <th class="col-modified">Modified</th>
+            <th class="col-name sortable" onclick="toggleSort('name')">Name ${sortCaretHtml('name')}</th>
+            <th class="col-size sortable" onclick="toggleSort('size')">Size ${sortCaretHtml('size')}</th>
+            <th class="col-modified sortable" onclick="toggleSort('date')">Modified ${sortCaretHtml('date')}</th>
             <th class="col-actions"></th>
           </tr>
         </thead>
@@ -228,6 +261,7 @@ function renderFileList() {
   }
 
   updateSelectionUI();
+  updateSortControlsUI();
 }
 
 async function refreshFiles(query = "") {
@@ -521,6 +555,17 @@ async function uploadFolder(fileList) {
   }
 }
 
+function attachLoadingBar(container, media) {
+  const bar = document.createElement("div");
+  bar.className = "top-loading-bar";
+  container.prepend(bar);
+  const hide = () => bar.remove();
+  const readyEvent = media.tagName === "VIDEO" || media.tagName === "AUDIO" ? "loadeddata" : "load";
+  media.addEventListener(readyEvent, hide);
+  media.addEventListener("error", hide);
+  if (media.tagName === "IMG" && media.complete) hide();
+}
+
 function openPreview(fileId, fileName, mimeType) {
   const overlay = document.getElementById("preview-overlay");
   const body = document.getElementById("preview-body");
@@ -536,6 +581,7 @@ function openPreview(fileId, fileName, mimeType) {
   } else {
     body.innerHTML = `<iframe class="preview-frame" src="${src}" title="Preview"></iframe>`;
   }
+  attachLoadingBar(body, body.firstElementChild);
 
   overlay.hidden = false;
 }
@@ -797,8 +843,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const searchInput = document.getElementById("search-input");
   const fileInputHeader = document.getElementById("file-input-header");
-  const fileInputDrop = document.getElementById("file-input-drop");
-  const dropZone = document.getElementById("drop-zone");
   const newBtn = document.getElementById("btn-new-menu-trigger");
   const newDropdown = document.getElementById("new-dropdown-menu");
 
@@ -823,6 +867,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Sort control (dropdown for field, separate button for direction)
+  document.getElementById("sort-field-btn")?.addEventListener("click", (e) => toggleDropdown(e, "sort-field-menu"));
+  document.getElementById("sort-field-menu")?.addEventListener("click", (e) => {
+    const opt = e.target.closest(".sort-option");
+    if (!opt) return;
+    document.getElementById("sort-field-menu")?.classList.remove("show");
+    toggleSort(opt.dataset.field);
+  });
+  document.getElementById("sort-direction-btn")?.addEventListener("click", () => {
+    setSortDirection(currentSort.dir === "asc" ? "desc" : "asc");
+  });
+  updateSortControlsUI();
+
   searchInput?.addEventListener("input", () => {
     renderFileList();
   });
@@ -833,14 +890,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
-  fileInputDrop?.addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      Array.from(e.target.files).forEach(file => uploadFile(file));
-    }
-  });
-
   const folderInputHeader = document.getElementById("folder-input-header");
-  const folderInputDrop = document.getElementById("folder-input-drop");
 
   folderInputHeader?.addEventListener("change", (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -849,38 +899,46 @@ document.addEventListener("DOMContentLoaded", () => {
     e.target.value = "";
   });
 
-  folderInputDrop?.addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      uploadFolder(e.target.files);
-    }
-    e.target.value = "";
-  });
+  // Drag-to-upload: a full-window overlay, shown only while a file is dragged
+  // over the page (mirrors Drive's behavior) rather than a permanent banner.
+  const dragOverlay = document.getElementById("drag-overlay");
+  if (dragOverlay && currentView === "home") {
+    let dragDepth = 0;
+    const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
 
-  if (dropZone) {
-    ["dragenter", "dragover"].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.add("dragover");
-      }, false);
+    window.addEventListener("dragenter", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth += 1;
+      dragOverlay.hidden = false;
     });
-
-    ["dragleave", "drop"].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        dropZone.classList.remove("dragover");
-      }, false);
+    window.addEventListener("dragover", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
     });
-
-    dropZone.addEventListener("drop", (e) => {
-      const dt = e.dataTransfer;
-      const files = dt.files;
+    window.addEventListener("dragleave", () => {
+      dragDepth = Math.max(0, dragDepth - 1);
+      if (dragDepth === 0) dragOverlay.hidden = true;
+    });
+    window.addEventListener("drop", (e) => {
+      if (!hasFiles(e)) return;
+      e.preventDefault();
+      dragDepth = 0;
+      dragOverlay.hidden = true;
+      const files = e.dataTransfer.files;
       if (files && files.length > 0) {
         Array.from(files).forEach(file => uploadFile(file));
       }
     });
+  } else {
+    // Still swallow stray drops elsewhere so the browser doesn't navigate away.
+    window.addEventListener("dragover", (e) => e.preventDefault());
+    window.addEventListener("drop", (e) => e.preventDefault());
   }
+
+  // Wire the Drive-style top loading bar for the immersive file preview (image/video/audio/iframe).
+  const immersiveMedia = document.querySelector(".immersive-content img, .immersive-content video, .immersive-content audio, .immersive-content iframe");
+  if (immersiveMedia) attachLoadingBar(immersiveMedia.closest(".immersive-content"), immersiveMedia);
 
   const filesView = document.getElementById("files-view-container");
   filesView?.addEventListener("click", (e) => {

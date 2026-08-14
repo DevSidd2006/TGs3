@@ -184,3 +184,91 @@ def test_share_endpoints(app_client: TestClient):
     dl_res_off = app_client.get(f"/s/{token}/download")
     assert dl_res_off.status_code == 404
 
+
+def test_star_file_endpoint(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("starme.txt", b"data", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    res = app_client.post(f"/files/{file_id}/star", json={"enabled": True})
+    assert res.status_code == 200
+    assert res.json()["starred"] is True
+
+    listing = app_client.get("/files?view=starred").json()
+    assert [f["id"] for f in listing["files"]] == [file_id]
+
+
+def test_star_folder_endpoint(app_client: TestClient):
+    folder = app_client.post("/folders", json={"name": "Docs", "parent_id": None}).json()
+    res = app_client.post(f"/folders/{folder['id']}/star", json={"enabled": True})
+    assert res.status_code == 200
+    assert res.json()["starred"] is True
+
+
+def test_star_missing_file_returns_404(app_client: TestClient):
+    res = app_client.post("/files/999999/star", json={"enabled": True})
+    assert res.status_code == 404
+
+
+def test_trash_restore_and_permanent_delete(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("trashme.txt", b"data", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    trashed = app_client.post(f"/files/{file_id}/trash")
+    assert trashed.status_code == 200
+    assert trashed.json()["deleted_at"] is not None
+
+    assert file_id not in [f["id"] for f in app_client.get("/files").json()]
+    trash_listing = app_client.get("/files?view=trash").json()
+    assert [f["id"] for f in trash_listing] == [file_id]
+
+    restored = app_client.post(f"/files/{file_id}/restore")
+    assert restored.status_code == 200
+    assert restored.json()["deleted_at"] is None
+    assert file_id in [f["id"] for f in app_client.get("/files").json()]
+
+    app_client.post(f"/files/{file_id}/trash")
+    deleted = app_client.delete(f"/files/{file_id}")
+    assert deleted.status_code == 204
+    assert app_client.get("/files?view=trash").json() == []
+
+
+def test_empty_trash_endpoint(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("trashme.txt", b"data", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+    app_client.post(f"/files/{file_id}/trash")
+
+    res = app_client.post("/trash/empty")
+    assert res.status_code == 200
+    assert res.json()["purged_count"] == 1
+    assert app_client.get("/files?view=trash").json() == []
+
+
+def test_recent_and_shared_views(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("recentme.txt", b"data", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    recent = app_client.get("/files?view=recent").json()
+    assert file_id in [f["id"] for f in recent]
+
+    app_client.post(f"/files/{file_id}/share", json={"enabled": True})
+    shared = app_client.get("/files?view=shared").json()
+    assert [f["id"] for f in shared] == [file_id]
+
+
+def test_index_page_renders_each_view(app_client: TestClient):
+    for view in ("home", "starred", "shared", "recent", "trash"):
+        res = app_client.get(f"/?view={view}")
+        assert res.status_code == 200
+

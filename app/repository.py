@@ -67,21 +67,75 @@ class FileRepository:
     def list_files(self, folder_id: int | None = None) -> list[StoredFile]:
         if folder_id is None:
             rows = self._connection.execute(
-                "SELECT * FROM files WHERE folder_id IS NULL ORDER BY uploaded_at DESC, id DESC"
+                "SELECT * FROM files WHERE folder_id IS NULL AND deleted_at IS NULL ORDER BY uploaded_at DESC, id DESC"
             ).fetchall()
         else:
             rows = self._connection.execute(
-                "SELECT * FROM files WHERE folder_id = ? ORDER BY uploaded_at DESC, id DESC",
+                "SELECT * FROM files WHERE folder_id = ? AND deleted_at IS NULL ORDER BY uploaded_at DESC, id DESC",
                 (folder_id,),
             ).fetchall()
         return [self._row_to_model(row) for row in rows]
 
     def search_files(self, query: str) -> list[StoredFile]:
         rows = self._connection.execute(
-            "SELECT * FROM files WHERE name LIKE ? ORDER BY uploaded_at DESC, id DESC",
+            "SELECT * FROM files WHERE name LIKE ? AND deleted_at IS NULL ORDER BY uploaded_at DESC, id DESC",
             (f"%{query}%",),
         ).fetchall()
         return [self._row_to_model(row) for row in rows]
+
+    def list_recent_files(self, limit: int = 50) -> list[StoredFile]:
+        rows = self._connection.execute(
+            "SELECT * FROM files WHERE deleted_at IS NULL ORDER BY uploaded_at DESC, id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+        return [self._row_to_model(row) for row in rows]
+
+    def list_starred_files(self) -> list[StoredFile]:
+        rows = self._connection.execute(
+            "SELECT * FROM files WHERE starred = 1 AND deleted_at IS NULL ORDER BY uploaded_at DESC, id DESC"
+        ).fetchall()
+        return [self._row_to_model(row) for row in rows]
+
+    def list_shared_files(self) -> list[StoredFile]:
+        rows = self._connection.execute(
+            "SELECT * FROM files WHERE share_token IS NOT NULL AND deleted_at IS NULL ORDER BY uploaded_at DESC, id DESC"
+        ).fetchall()
+        return [self._row_to_model(row) for row in rows]
+
+    def list_trashed_files(self) -> list[StoredFile]:
+        rows = self._connection.execute(
+            "SELECT * FROM files WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC"
+        ).fetchall()
+        return [self._row_to_model(row) for row in rows]
+
+    def set_file_starred(self, file_id: int, starred: bool) -> StoredFile | None:
+        self._connection.execute(
+            "UPDATE files SET starred = ? WHERE id = ?", (1 if starred else 0, file_id)
+        )
+        self._connection.commit()
+        return self.get_file(file_id)
+
+    def trash_file(self, file_id: int) -> StoredFile | None:
+        self._connection.execute(
+            "UPDATE files SET deleted_at = ? WHERE id = ?",
+            (datetime.utcnow().isoformat(), file_id),
+        )
+        self._connection.commit()
+        return self.get_file(file_id)
+
+    def restore_file(self, file_id: int) -> StoredFile | None:
+        self._connection.execute("UPDATE files SET deleted_at = NULL WHERE id = ?", (file_id,))
+        self._connection.commit()
+        return self.get_file(file_id)
+
+    def purge_file(self, file_id: int) -> None:
+        self._connection.execute("DELETE FROM files WHERE id = ?", (file_id,))
+        self._connection.commit()
+
+    def purge_all_trashed(self) -> int:
+        cursor = self._connection.execute("DELETE FROM files WHERE deleted_at IS NOT NULL")
+        self._connection.commit()
+        return cursor.rowcount
 
     def create_folder(self, *, name: str, parent_id: int | None) -> Folder:
         name = name.strip()
@@ -125,15 +179,34 @@ class FileRepository:
 
     def get_folder(self, folder_id: int) -> Folder | None:
         row = self._connection.execute("SELECT * FROM folders WHERE id = ?", (folder_id,)).fetchone()
-        if row is None:
-            return None
-        return Folder(id=row["id"], name=row["name"], parent_id=row["parent_id"])
+        return None if row is None else self._row_to_folder(row)
 
     def list_folders(self) -> list[Folder]:
         rows = self._connection.execute(
             "SELECT * FROM folders ORDER BY name COLLATE NOCASE, id"
         ).fetchall()
-        return [Folder(id=row["id"], name=row["name"], parent_id=row["parent_id"]) for row in rows]
+        return [self._row_to_folder(row) for row in rows]
+
+    def list_starred_folders(self) -> list[Folder]:
+        rows = self._connection.execute(
+            "SELECT * FROM folders WHERE starred = 1 ORDER BY name COLLATE NOCASE, id"
+        ).fetchall()
+        return [self._row_to_folder(row) for row in rows]
+
+    def set_folder_starred(self, folder_id: int, starred: bool) -> Folder | None:
+        self._connection.execute(
+            "UPDATE folders SET starred = ? WHERE id = ?", (1 if starred else 0, folder_id)
+        )
+        self._connection.commit()
+        return self.get_folder(folder_id)
+
+    def _row_to_folder(self, row: sqlite3.Row) -> Folder:
+        return Folder(
+            id=row["id"],
+            name=row["name"],
+            parent_id=row["parent_id"],
+            starred=bool(row["starred"]) if "starred" in row.keys() else False,
+        )
 
     def move_file(self, *, file_id: int, folder_id: int | None) -> StoredFile:
         if self.get_file(file_id) is None:
@@ -189,6 +262,8 @@ class FileRepository:
             uploaded_at=datetime.fromisoformat(row["uploaded_at"]),
             folder_id=row["folder_id"] if "folder_id" in row.keys() else None,
             share_token=row["share_token"] if "share_token" in row.keys() else None,
+            starred=bool(row["starred"]) if "starred" in row.keys() else False,
+            deleted_at=row["deleted_at"] if "deleted_at" in row.keys() else None,
         )
 
 

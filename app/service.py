@@ -70,6 +70,48 @@ class StorageService:
     def get_shared_file(self, token: str):
         return self._repository.get_file_by_share_token(token)
 
+    def list_recent(self, limit: int = 50):
+        return self._repository.list_recent_files(limit)
+
+    def list_starred(self) -> dict:
+        return {
+            "files": self._repository.list_starred_files(),
+            "folders": self._repository.list_starred_folders(),
+        }
+
+    def list_shared(self):
+        return self._repository.list_shared_files()
+
+    def list_trash(self):
+        return self._repository.list_trashed_files()
+
+    def star_file(self, file_id: int, starred: bool):
+        stored = self._repository.set_file_starred(file_id, starred)
+        if stored is None:
+            raise FileNotFoundError(f"File {file_id} not found")
+        return stored
+
+    def star_folder(self, folder_id: int, starred: bool):
+        return self._repository.set_folder_starred(folder_id, starred)
+
+    def trash_file(self, file_id: int):
+        stored = self._repository.trash_file(file_id)
+        if stored is None:
+            raise FileNotFoundError(f"File {file_id} not found")
+        return stored
+
+    def restore_file(self, file_id: int):
+        stored = self._repository.restore_file(file_id)
+        if stored is None:
+            raise FileNotFoundError(f"File {file_id} not found")
+        return stored
+
+    def purge_file(self, file_id: int) -> None:
+        self._repository.purge_file(file_id)
+
+    def empty_trash(self) -> int:
+        return self._repository.purge_all_trashed()
+
     async def download_file(self, file_id: int) -> DownloadedTelegramFile:
         stored = self._repository.get_file(file_id)
         if stored is None or stored.telegram_message_id is None:

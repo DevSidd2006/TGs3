@@ -41,6 +41,14 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
     if "share_token" not in file_columns:
         connection.execute("ALTER TABLE files ADD COLUMN share_token TEXT")
         connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_share_token ON files(share_token)")
+    if "starred" not in file_columns:
+        connection.execute("ALTER TABLE files ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+    if "deleted_at" not in file_columns:
+        connection.execute("ALTER TABLE files ADD COLUMN deleted_at TEXT")
+
+    folder_columns = {row["name"] for row in connection.execute("PRAGMA table_info(folders)")}
+    if "starred" not in folder_columns:
+        connection.execute("ALTER TABLE folders ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS users (

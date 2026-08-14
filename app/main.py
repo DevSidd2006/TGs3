@@ -33,11 +33,16 @@ def serialize_file(stored) -> dict:
         "uploaded_at": stored.uploaded_at.isoformat(),
         "folder_id": getattr(stored, "folder_id", None),
         "share_token": getattr(stored, "share_token", None),
+        "starred": getattr(stored, "starred", False),
+        "deleted_at": getattr(stored, "deleted_at", None),
     }
 
 
 def serialize_folder(folder) -> dict:
-    return {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id}
+    return {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id, "starred": getattr(folder, "starred", False)}
+
+
+VIEW_TITLES = {"starred": "Starred", "shared": "Shared with me", "recent": "Recent", "trash": "Trash"}
 
 
 def format_bytes(num: int | None) -> str:
@@ -58,7 +63,7 @@ def build_folder_tree(folders: list) -> list[dict]:
     roots: list[dict] = []
     by_id = {f.id: f for f in folders}
     for folder in folders:
-        node = {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id, "children": children[folder.id]}
+        node = {"id": folder.id, "name": folder.name, "parent_id": folder.parent_id, "starred": folder.starred, "children": children[folder.id]}
         if folder.parent_id is None:
             roots.append(node)
         elif folder.parent_id in by_id:
@@ -148,12 +153,27 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return response
 
     @app.get("/", response_class=HTMLResponse)
-    def index(request: Request, folder_id: int | None = None):
+    def index(request: Request, folder_id: int | None = None, view: str = "home"):
         require_page_route(request)
-        files = service.list_files(folder_id=folder_id)
+        if view not in ("home", "starred", "shared", "recent", "trash"):
+            view = "home"
         folders = service.list_folders()
-        breadcrumb = service.get_breadcrumb(folder_id) if folder_id is not None else []
-        subfolders = [folder for folder in folders if folder.parent_id == folder_id]
+        breadcrumb: list = []
+        folder_grid_items: list = []
+        if view == "starred":
+            starred = service.list_starred()
+            files = starred["files"]
+            folder_grid_items = starred["folders"]
+        elif view == "shared":
+            files = service.list_shared()
+        elif view == "recent":
+            files = service.list_recent()
+        elif view == "trash":
+            files = service.list_trash()
+        else:
+            files = service.list_files(folder_id=folder_id)
+            breadcrumb = service.get_breadcrumb(folder_id) if folder_id is not None else []
+            folder_grid_items = [folder for folder in folders if folder.parent_id == folder_id]
         return templates.TemplateResponse(
             request,
             "index.html",
@@ -161,9 +181,11 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
                 "files": [serialize_file(item) for item in files],
                 "folders": [serialize_folder(item) for item in folders],
                 "folder_tree": build_folder_tree(folders),
-                "subfolders": [serialize_folder(item) for item in subfolders],
+                "subfolders": [serialize_folder(item) for item in folder_grid_items],
                 "breadcrumb": [serialize_folder(item) for item in breadcrumb],
                 "current_folder_id": folder_id,
+                "current_view": view,
+                "view_title": VIEW_TITLES.get(view),
             },
         )
 
@@ -191,8 +213,20 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return JSONResponse(serialize_file(stored), status_code=201)
 
     @app.get("/files")
-    def list_files(request: Request, folder_id: int | None = None):
+    def list_files(request: Request, folder_id: int | None = None, view: str = "home"):
         require_auth_route(request)
+        if view == "starred":
+            starred = service.list_starred()
+            return {
+                "files": [serialize_file(item) for item in starred["files"]],
+                "folders": [serialize_folder(item) for item in starred["folders"]],
+            }
+        if view == "shared":
+            return [serialize_file(item) for item in service.list_shared()]
+        if view == "recent":
+            return [serialize_file(item) for item in service.list_recent()]
+        if view == "trash":
+            return [serialize_file(item) for item in service.list_trash()]
         return [serialize_file(item) for item in service.list_files(folder_id=folder_id)]
 
     @app.get("/files/search")
@@ -234,6 +268,14 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
             raise HTTPException(status_code=409, detail=str(exc)) from exc
         return Response(status_code=204)
 
+    @app.post("/folders/{folder_id}/star")
+    def star_folder(request: Request, folder_id: int, payload: dict):
+        require_auth_route(request)
+        folder = service.star_folder(folder_id, bool(payload.get("enabled", False)))
+        if folder is None:
+            raise HTTPException(status_code=404, detail=f"folder {folder_id} not found")
+        return serialize_folder(folder)
+
     @app.post("/files/{file_id}/move")
     def move_file(request: Request, file_id: int, payload: dict):
         require_auth_route(request)
@@ -242,6 +284,44 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         except ValueError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
         return serialize_file(stored)
+
+    @app.post("/files/{file_id}/star")
+    def star_file(request: Request, file_id: int, payload: dict):
+        require_auth_route(request)
+        try:
+            stored = service.star_file(file_id, bool(payload.get("enabled", False)))
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return serialize_file(stored)
+
+    @app.post("/files/{file_id}/trash")
+    def trash_file(request: Request, file_id: int):
+        require_auth_route(request)
+        try:
+            stored = service.trash_file(file_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return serialize_file(stored)
+
+    @app.post("/files/{file_id}/restore")
+    def restore_file(request: Request, file_id: int):
+        require_auth_route(request)
+        try:
+            stored = service.restore_file(file_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        return serialize_file(stored)
+
+    @app.delete("/files/{file_id}", status_code=204)
+    def delete_file_forever(request: Request, file_id: int):
+        require_auth_route(request)
+        service.purge_file(file_id)
+        return Response(status_code=204)
+
+    @app.post("/trash/empty")
+    def empty_trash(request: Request):
+        require_auth_route(request)
+        return {"purged_count": service.empty_trash()}
 
     @app.get("/files/{file_id}")
     def file_detail(request: Request, file_id: int):

@@ -5,6 +5,12 @@ let viewMode = 'list';
 let selectedFileId = null;
 let activeTab = 'home';
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]));
+}
+
 function formatBytes(bytes) {
   if (!bytes) return "0 B";
   const k = 1024, sizes = ["B", "KB", "MB", "GB", "TB"];
@@ -100,7 +106,7 @@ function renderFolders() {
   grid.innerHTML = currentSubfolders.map(folder => `
     <div class="m-folder-card" data-id="${folder.id}">
       <i class="ph-fill ph-folder m-folder-icon"></i>
-      <span class="m-folder-name">${folder.name}</span>
+      <span class="m-folder-name">${escapeHtml(folder.name)}</span>
     </div>
   `).join("");
 }
@@ -139,16 +145,17 @@ function renderFiles() {
 
   list.innerHTML = displayFiles.map(file => {
     const badge = getBadgeInfo(file.mime_type, file.name);
+    const name = escapeHtml(file.name);
     return `
       <div class="m-file-card" data-id="${file.id}">
         <div class="m-file-icon-box ${badge.class}">
           <i class="ph-fill ${badge.icon}"></i>
         </div>
         <div class="m-file-info">
-          <div class="m-file-title">${file.name}</div>
+          <div class="m-file-title">${name}</div>
           <div class="m-file-sub">${formatBytes(file.size_bytes)} • ${formatDate(file.uploaded_at)}</div>
         </div>
-        <button class="m-file-more" data-action="options" data-id="${file.id}" data-name="${file.name}">
+        <button class="m-file-more" data-action="options" data-id="${file.id}" data-name="${name}">
           <i class="ph-bold ph-dots-three-vertical"></i>
         </button>
       </div>

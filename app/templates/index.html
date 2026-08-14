@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block body %}
-<div class="drive-app" data-current-folder="{{ current_folder_id or '' }}">
+<div class="drive-app" data-current-folder="{{ current_folder_id or '' }}" data-current-view="{{ current_view }}">
   <!-- Top Drive Header Bar -->
   <header class="drive-header">
     <div class="header-left">
@@ -35,6 +35,7 @@
   <div class="drive-body">
     <!-- Left Navigation Sidebar -->
     <aside class="drive-sidebar">
+      {% if current_view == 'home' %}
       <!-- + New Floating Button -->
       <div class="new-btn-container">
         <button class="btn-new" id="btn-new-menu-trigger">
@@ -60,14 +61,39 @@
 
       <input id="file-input-header" type="file" style="display: none;" multiple>
       <input id="folder-input-header" type="file" webkitdirectory multiple style="display: none;">
+      {% endif %}
 
       <!-- Sidebar Navigation Menu -->
       <nav class="sidebar-nav">
         <ul class="nav-list">
-          <li class="nav-item active" data-category="all">
-            <a href="/" onclick="filterCategory('all'); return false;">
+          <li class="nav-item{{ ' active' if current_view == 'home' }}">
+            <a href="/">
               <i class="ph-fill ph-house"></i>
               <span class="nav-label">Home</span>
+            </a>
+          </li>
+          <li class="nav-item{{ ' active' if current_view == 'shared' }}">
+            <a href="/?view=shared">
+              <i class="ph-fill ph-users"></i>
+              <span class="nav-label">Shared</span>
+            </a>
+          </li>
+          <li class="nav-item{{ ' active' if current_view == 'starred' }}">
+            <a href="/?view=starred">
+              <i class="ph-fill ph-star"></i>
+              <span class="nav-label">Starred</span>
+            </a>
+          </li>
+          <li class="nav-item{{ ' active' if current_view == 'recent' }}">
+            <a href="/?view=recent">
+              <i class="ph-fill ph-clock-counter-clockwise"></i>
+              <span class="nav-label">Recent</span>
+            </a>
+          </li>
+          <li class="nav-item{{ ' active' if current_view == 'trash' }}">
+            <a href="/?view=trash">
+              <i class="ph-fill ph-trash"></i>
+              <span class="nav-label">Trash</span>
             </a>
           </li>
         </ul>
@@ -89,7 +115,9 @@
       <div class="workspace-header">
         <div class="workspace-title-row">
           <h1 class="page-heading" id="page-heading">
-            {% if breadcrumb %}
+            {% if view_title %}
+              {{ view_title }}
+            {% elif breadcrumb %}
               {% for crumb in breadcrumb %}
                 {{ crumb.name }}
               {% endfor %}
@@ -109,6 +137,7 @@
         </div>
       </div>
 
+      {% if current_view == 'home' %}
       <!-- Drop Zone Container (Drag & Drop files) -->
       <div id="drop-zone" class="drag-drop-banner">
         <div class="drop-content">
@@ -118,19 +147,20 @@
         <input id="file-input-drop" type="file" multiple style="display: none;">
         <input id="folder-input-drop" type="file" webkitdirectory multiple style="display: none;">
       </div>
+      {% endif %}
 
       <!-- Folders Section -->
-      <section class="drive-section" id="folders-section">
+      <section class="drive-section" id="folders-section"{{ ' hidden' if not subfolders and current_view != 'home' }}>
         <div class="section-title-bar">
           <button class="section-toggle-btn">
             <i class="ph-bold ph-caret-down"></i>
-            <h2>Folders</h2>
+            <h2>{{ 'Starred folders' if current_view == 'starred' else 'Folders' }}</h2>
           </button>
         </div>
 
         <div class="folders-grid" id="folders-grid-container">
           {% for folder in subfolders %}
-          <div class="folder-card" onclick="window.location.href='/?folder_id={{ folder.id }}'">
+          <div class="folder-card" data-id="{{ folder.id }}" data-name="{{ folder.name | escape }}">
             <div class="folder-card-icon">
               <i class="ph-fill ph-folder" style="color: #1a73e8;"></i>
             </div>
@@ -138,9 +168,18 @@
               <span class="folder-card-name" title="{{ folder.name }}">{{ folder.name }}</span>
               <span class="folder-card-location">in TGS3</span>
             </div>
-            <button class="folder-card-menu-btn folder-menu-btn" data-folder-id="{{ folder.id }}" data-folder-name="{{ folder.name }}" type="button" onclick="event.stopPropagation();">
-              <i class="ph-bold ph-dots-three-vertical"></i>
-            </button>
+            {% if folder.starred %}<i class="ph-fill ph-star folder-star-indicator" title="Starred"></i>{% endif %}
+            <div class="dropdown">
+              <button class="folder-card-menu-btn action-menu-btn" onclick="toggleDropdown(event, 'folder-menu-{{ folder.id }}')" title="More actions" type="button">
+                <i class="ph-bold ph-dots-three-vertical"></i>
+              </button>
+              <div id="folder-menu-{{ folder.id }}" class="dropdown-content">
+                <button class="folder-new-trigger" data-id="{{ folder.id }}"><i class="ph-bold ph-folder-plus"></i> New subfolder</button>
+                <button class="folder-rename-trigger" data-id="{{ folder.id }}"><i class="ph-bold ph-pencil-simple"></i> Rename</button>
+                <button class="folder-star-trigger" data-id="{{ folder.id }}" data-starred="{{ 'true' if folder.starred else 'false' }}"><i class="ph-bold ph-star"></i> {{ 'Unstar' if folder.starred else 'Star' }}</button>
+                <button class="folder-delete-trigger" data-id="{{ folder.id }}" data-name="{{ folder.name | escape }}"><i class="ph-bold ph-trash"></i> Delete</button>
+              </div>
+            </div>
           </div>
           {% endfor %}
         </div>
@@ -148,20 +187,42 @@
 
       <!-- Files Section -->
       <section class="drive-section" id="files-section">
-        <div class="section-title-bar file-section-bar">
+        <div class="section-title-bar file-section-bar" id="section-title-bar-normal">
           <button class="section-toggle-btn">
             <i class="ph-bold ph-caret-down"></i>
-            <h2>Files</h2>
+            <h2>{{ 'Trash' if current_view == 'trash' else 'Files' }}</h2>
           </button>
 
-          <!-- View Mode & Action Toggle Group -->
-          <div class="view-toggle-pill-group">
-            <button class="toggle-pill-btn active" id="btn-view-list" title="List view" onclick="setViewMode('list')">
-              <i class="ph-bold ph-list-bullets"></i>
-            </button>
-            <button class="toggle-pill-btn" id="btn-view-grid" title="Grid view" onclick="setViewMode('grid')">
-              <i class="ph-bold ph-squares-four"></i>
-            </button>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            {% if current_view == 'trash' %}
+            <button class="btn-flat" id="btn-empty-trash" title="Permanently delete everything in Trash"><i class="ph-bold ph-trash"></i> Empty trash</button>
+            {% endif %}
+            <!-- View Mode & Action Toggle Group -->
+            <div class="view-toggle-pill-group">
+              <button class="toggle-pill-btn active" id="btn-view-list" title="List view" onclick="setViewMode('list')">
+                <i class="ph-bold ph-list-bullets"></i>
+              </button>
+              <button class="toggle-pill-btn" id="btn-view-grid" title="Grid view" onclick="setViewMode('grid')">
+                <i class="ph-bold ph-squares-four"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Contextual Selection Toolbar (shown when items are checked) -->
+        <div class="selection-toolbar" id="selection-toolbar" hidden>
+          <button class="icon-btn" id="selection-clear" title="Clear selection"><i class="ph-bold ph-x"></i></button>
+          <span class="selection-count" id="selection-count">0 selected</span>
+          <div class="selection-actions">
+            {% if current_view == 'trash' %}
+            <button class="icon-btn" id="selection-restore" title="Restore"><i class="ph-bold ph-arrow-counter-clockwise"></i></button>
+            <button class="icon-btn" id="selection-delete-forever" title="Delete forever"><i class="ph-bold ph-trash"></i></button>
+            {% else %}
+            <button class="icon-btn" id="selection-star" title="Star"><i class="ph-bold ph-star"></i></button>
+            <button class="icon-btn" id="selection-move" title="Move"><i class="ph-bold ph-folder-notch"></i></button>
+            <button class="icon-btn" id="selection-download" title="Download"><i class="ph-bold ph-download-simple"></i></button>
+            <button class="icon-btn" id="selection-trash" title="Move to trash"><i class="ph-bold ph-trash"></i></button>
+            {% endif %}
           </div>
         </div>
 
@@ -170,6 +231,7 @@
           <table class="drive-file-table">
             <thead>
               <tr>
+                <th class="col-select"><input type="checkbox" id="select-all-checkbox" title="Select all"></th>
                 <th class="col-name" onclick="toggleSort('name')">Name <i class="ph-bold ph-caret-down"></i></th>
                 <th class="col-size">Size</th>
                 <th class="col-modified">Modified</th>
@@ -178,13 +240,15 @@
             </thead>
             <tbody id="file-table-body">
               {% for file in files %}
-              <tr>
+              <tr data-id="{{ file.id }}">
+                <td><input type="checkbox" class="row-select" data-id="{{ file.id }}"></td>
                 <td>
                   <div class="file-cell">
                     <div class="file-type-icon icon-doc">
                       <i class="ph-fill ph-file-text"></i>
                     </div>
                     <a href="/view/files/{{ file.id }}" class="file-title-link" title="{{ file.name }}">{{ file.name }}</a>
+                    {% if file.starred %}<i class="ph-fill ph-star star-indicator" title="Starred"></i>{% endif %}
                   </div>
                 </td>
                 <td><span class="file-size-text">{{ file.size_bytes | format_bytes }}</span></td>
@@ -195,10 +259,17 @@
                       <i class="ph-bold ph-dots-three-vertical"></i>
                     </button>
                     <div id="file-menu-{{ file.id }}" class="dropdown-content">
-                      <button class="preview-trigger" data-id="{{ file.id }}" data-mime="{{ file.mime_type or '' }}" data-name="{{ file.name }}"><i class="ph-bold ph-eye"></i> Preview</button>
+                      {% if current_view == 'trash' %}
+                      <button class="restore-trigger" data-id="{{ file.id }}"><i class="ph-bold ph-arrow-counter-clockwise"></i> Restore</button>
+                      <button class="delete-forever-trigger" data-id="{{ file.id }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-trash"></i> Delete forever</button>
+                      {% else %}
+                      <button class="preview-trigger" data-id="{{ file.id }}" data-mime="{{ file.mime_type or '' }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-eye"></i> Preview</button>
+                      <button class="star-trigger" data-id="{{ file.id }}" data-starred="{{ 'true' if file.starred else 'false' }}"><i class="ph-bold ph-star"></i> {{ 'Unstar' if file.starred else 'Star' }}</button>
                       <button class="move-trigger" data-id="{{ file.id }}"><i class="ph-bold ph-folder-notch"></i> Move</button>
                       <button class="share-trigger" data-id="{{ file.id }}" data-token="{{ file.share_token or '' }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-share-network"></i> Share</button>
                       <a href="/files/{{ file.id }}/download"><i class="ph-bold ph-download-simple"></i> Download</a>
+                      <button class="trash-trigger" data-id="{{ file.id }}"><i class="ph-bold ph-trash"></i> Move to trash</button>
+                      {% endif %}
                     </div>
                   </div>
                 </td>
@@ -211,6 +282,9 @@
     </main>
   </div>
 </div>
+
+<!-- Right-click Context Menu -->
+<div id="context-menu" class="dropdown-content context-menu" hidden></div>
 
 <!-- Folder Modal (Create/Rename) -->
 <div id="folder-modal" class="preview-overlay" hidden>

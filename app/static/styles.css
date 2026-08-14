@@ -1216,3 +1216,170 @@ body {
 .dropdown-content i {
   font-size: 18px;
 }
+
+/* Immersive File View (file_detail.html, shared_file.html) */
+.immersive-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+.immersive-header {
+  height: 64px;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: var(--drive-bg);
+  border-bottom: 1px solid var(--border-light);
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.immersive-header .left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.immersive-header .back-btn {
+  color: var(--text-primary);
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: var(--transition);
+}
+
+.immersive-header .back-btn:hover {
+  background: rgba(60, 64, 67, 0.08);
+}
+
+.immersive-header .file-name {
+  font-size: 18px;
+  font-weight: 500;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 400px;
+}
+
+.immersive-header .right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.immersive-content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--drive-sidebar-bg);
+  overflow: hidden;
+  position: relative;
+}
+
+.immersive-content iframe,
+.immersive-content img,
+.immersive-content video {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.immersive-content img {
+  object-fit: contain;
+}
+
+/* [hidden] must win over component classes that set their own `display` */
+.drive-section[hidden],
+.selection-toolbar[hidden],
+#section-title-bar-normal[hidden] {
+  display: none;
+}
+
+/* Star indicators */
+.star-indicator,
+.folder-star-indicator {
+  color: #f9ab00;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* Checkbox column (list view) */
+.col-select {
+  width: 40px;
+}
+
+.row-select {
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  accent-color: #1a73e8;
+}
+
+/* Checkbox overlay (grid view) */
+.grid-file-card {
+  position: relative;
+}
+
+.grid-file-card .grid-select {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 5;
+  opacity: 0;
+  transition: var(--transition);
+}
+
+.grid-file-card:hover .grid-select,
+.grid-file-card .grid-select:checked {
+  opacity: 1;
+}
+
+/* Contextual Selection Toolbar */
+.selection-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px 6px 16px;
+  background: var(--drive-active-pill);
+  border-radius: var(--radius-card);
+}
+
+.selection-toolbar .icon-btn {
+  color: var(--drive-active-text);
+}
+
+.selection-toolbar .icon-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.selection-count {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--drive-active-text);
+  flex: 1;
+}
+
+.selection-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Right-click context menu (positioned via inline style, see app.js) */
+.context-menu {
+  position: fixed;
+  z-index: 3000;
+}
+
+.btn-flat i {
+  margin-right: 6px;
+}

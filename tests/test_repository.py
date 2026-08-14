@@ -130,6 +130,103 @@ class TestFolderRepository:
         assert [(f.id, f.name) for f in crumbs] == [(root.id, "Photos"), (year.id, "2024"), (trip.id, "Trip")]
 
 
+class TestStarredAndTrash:
+    def _repo(self, tmp_path: Path) -> FileRepository:
+        connection = connect_db(tmp_path / "files.db")
+        ensure_schema(connection)
+        return FileRepository(connection)
+
+    def test_new_files_and_folders_start_unstarred(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        file = repository.create_uploading(name="a.txt", size_bytes=1, mime_type="text/plain")
+        folder = repository.create_folder(name="Docs", parent_id=None)
+        assert file.starred is False
+        assert file.deleted_at is None
+        assert folder.starred is False
+
+    def test_set_file_starred_toggles_and_lists(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        file = repository.create_uploading(name="a.txt", size_bytes=1, mime_type="text/plain")
+        repository.mark_failed(file.id)
+
+        starred = repository.set_file_starred(file.id, True)
+        assert starred.starred is True
+        assert [f.id for f in repository.list_starred_files()] == [file.id]
+
+        unstarred = repository.set_file_starred(file.id, False)
+        assert unstarred.starred is False
+        assert repository.list_starred_files() == []
+
+    def test_set_folder_starred_toggles_and_lists(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        folder = repository.create_folder(name="Docs", parent_id=None)
+        repository.set_folder_starred(folder.id, True)
+        assert [f.id for f in repository.list_starred_folders()] == [folder.id]
+        repository.set_folder_starred(folder.id, False)
+        assert repository.list_starred_folders() == []
+
+    def test_trash_then_restore_file(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        file = repository.create_uploading(name="a.txt", size_bytes=1, mime_type="text/plain")
+        repository.mark_failed(file.id)
+
+        trashed = repository.trash_file(file.id)
+        assert trashed.deleted_at is not None
+        assert repository.list_files() == []
+        assert [f.id for f in repository.list_trashed_files()] == [file.id]
+
+        restored = repository.restore_file(file.id)
+        assert restored.deleted_at is None
+        assert [f.id for f in repository.list_files()] == [file.id]
+        assert repository.list_trashed_files() == []
+
+    def test_search_excludes_trashed_files(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        file = repository.create_uploading(name="budget.xlsx", size_bytes=1, mime_type="application/vnd.ms-excel")
+        repository.mark_failed(file.id)
+        repository.trash_file(file.id)
+        assert repository.search_files("budget") == []
+
+    def test_purge_file_removes_row(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        file = repository.create_uploading(name="a.txt", size_bytes=1, mime_type="text/plain")
+        repository.mark_failed(file.id)
+        repository.trash_file(file.id)
+        repository.purge_file(file.id)
+        assert repository.get_file(file.id) is None
+
+    def test_purge_all_trashed_only_removes_trashed(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        kept = repository.create_uploading(name="kept.txt", size_bytes=1, mime_type="text/plain")
+        trashed = repository.create_uploading(name="gone.txt", size_bytes=1, mime_type="text/plain")
+        repository.mark_failed(kept.id)
+        repository.mark_failed(trashed.id)
+        repository.trash_file(trashed.id)
+
+        count = repository.purge_all_trashed()
+
+        assert count == 1
+        assert repository.get_file(kept.id) is not None
+        assert repository.get_file(trashed.id) is None
+
+    def test_list_shared_files_only_returns_files_with_token(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        shared = repository.create_uploading(name="shared.txt", size_bytes=1, mime_type="text/plain")
+        private = repository.create_uploading(name="private.txt", size_bytes=1, mime_type="text/plain")
+        repository.mark_failed(shared.id)
+        repository.mark_failed(private.id)
+        repository.set_share_token(shared.id, True)
+
+        assert [f.id for f in repository.list_shared_files()] == [shared.id]
+
+    def test_list_recent_files_respects_limit(self, tmp_path: Path):
+        repository = self._repo(tmp_path)
+        for i in range(3):
+            f = repository.create_uploading(name=f"f{i}.txt", size_bytes=1, mime_type="text/plain")
+            repository.mark_failed(f.id)
+        assert len(repository.list_recent_files(limit=2)) == 2
+
+
 def test_upsert_synced_file_updates_existing_row(tmp_path: Path):
     connection = connect_db(tmp_path / "files.db")
     ensure_schema(connection)

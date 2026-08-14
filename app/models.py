@@ -15,6 +15,8 @@ class StoredFile:
     uploaded_at: datetime
     folder_id: int | None = None
     share_token: str | None = None
+    starred: bool = False
+    deleted_at: str | None = None
 
 
 @dataclass(frozen=True)
@@ -22,3 +24,4 @@ class Folder:
     id: int
     name: str
     parent_id: int | None
+    starred: bool = False

@@ -111,6 +111,24 @@ body {
   letter-spacing: -0.2px;
 }
 
+/* TGS3 Logo Theme Switching */
+.tgs3-logo {
+  border-radius: 8px;
+  object-fit: contain;
+}
+
+.tgs3-logo-dark {
+  display: none;
+}
+
+[data-theme="dark"] .tgs3-logo-light {
+  display: none;
+}
+
+[data-theme="dark"] .tgs3-logo-dark {
+  display: inline-block;
+}
+
 /* Header Search Container */
 .header-search-container {
   flex: 1;

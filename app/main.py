@@ -436,6 +436,15 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return {"synced_count": count}
 
 
+    LOGO_DIR = Path(__file__).parent.parent / "logo"
+
+    @app.get("/logo/{name}")
+    def serve_logo(name: str):
+        allowed = {"tgs3-logo-dark.png", "tgs3-logo-light.png"}
+        if name not in allowed:
+            raise HTTPException(status_code=404, detail="logo not found")
+        return Response(content=(LOGO_DIR / name).read_bytes(), media_type="image/png")
+
     MOBILE_DIR = Path(__file__).parent.parent / "mobile"
 
     @app.get("/mobile", response_class=HTMLResponse)

@@ -95,6 +95,25 @@ body, html {
   cursor: pointer;
 }
 
+/* Mobile Logo Theme Switching */
+.m-logo {
+  border-radius: 6px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.tgs3-logo-dark {
+  display: none;
+}
+
+[data-theme="dark"] .tgs3-logo-light {
+  display: none;
+}
+
+[data-theme="dark"] .tgs3-logo-dark {
+  display: inline-block;
+}
+
 .m-icon-btn.active {
   background: var(--m-active-pill);
   color: var(--m-active-text);

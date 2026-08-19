@@ -19,6 +19,7 @@ RUN pip install --no-cache-dir .
 # Copy application code, templates, static assets, and mobile PWA
 COPY app app
 COPY mobile mobile
+COPY logo logo
 
 # Create data directory for SQLite database & preview cache
 RUN mkdir -p /app/.data/previews

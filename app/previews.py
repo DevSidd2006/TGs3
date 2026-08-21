@@ -73,7 +73,10 @@ class PreviewRenderer:
             return None
         pdf_path = self._cache_dir / f"{file_id}.pdf"
         if not pdf_path.exists():
-            pdf_path = self._convert_to_pdf(downloaded.filename, downloaded.content, pdf_path)
+            try:
+                pdf_path = self._convert_to_pdf(downloaded.filename, downloaded.content, pdf_path)
+            except (OSError, subprocess.SubprocessError, RuntimeError):
+                return None
         return DownloadedTelegramFile(
             filename=pdf_path.name,
             content=pdf_path.read_bytes(),

@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 from app.previews import PreviewRenderer
 from app.telegram_bridge import DownloadedTelegramFile
@@ -104,3 +105,21 @@ def test_markdown_preview_passes_through(tmp_path: Path):
     assert preview is not None
     assert preview.mime_type == "text/markdown"
     assert preview.content == b"# Title"
+
+
+def test_office_conversion_failure_returns_none(tmp_path: Path, monkeypatch):
+    renderer = PreviewRenderer(tmp_path)
+    downloaded = DownloadedTelegramFile(
+        filename="report.docx",
+        content=b"docx-bytes",
+        mime_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    )
+
+    def boom(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, ["libreoffice"])
+
+    monkeypatch.setattr("app.previews.subprocess.run", boom)
+
+    preview = renderer.render(file_id=8, downloaded=downloaded)
+
+    assert preview is None

@@ -72,3 +72,40 @@ def test_static_and_manifest_exempt_from_auth(tmp_path):
     client, _ = make_client(tmp_path)
     assert client.get("/static/styles.css?v=9").status_code == 200
     assert client.get("/mobile/manifest.webmanifest").status_code == 200
+
+
+def test_login_page_neutralizes_external_next(tmp_path):
+    client, _ = make_client(tmp_path)
+    response = client.get("/login", params={"next": "https://evil.example/phish"})
+    assert response.status_code == 200
+    assert "https://evil.example" not in response.text
+
+
+def test_login_post_neutralizes_external_next(tmp_path):
+    client, _ = make_client(tmp_path, password="s3cret")
+    response = client.post(
+        "/login",
+        data={"username": "admin", "password": "s3cret", "next": "https://evil.example/phish"},
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/"
+
+
+def test_login_post_neutralizes_protocol_relative_next(tmp_path):
+    client, _ = make_client(tmp_path, password="s3cret")
+    response = client.post(
+        "/login",
+        data={"username": "admin", "password": "s3cret", "next": "//evil.example/phish"},
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/"
+
+
+def test_login_post_allows_relative_next(tmp_path):
+    client, _ = make_client(tmp_path, password="s3cret")
+    response = client.post(
+        "/login",
+        data={"username": "admin", "password": "s3cret", "next": "/view/files/1"},
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/view/files/1"

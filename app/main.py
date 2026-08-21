@@ -10,6 +10,7 @@ from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 from telethon import TelegramClient
 from telethon.sessions import StringSession
 
@@ -43,6 +44,22 @@ def serialize_folder(folder) -> dict:
 
 
 VIEW_TITLES = {"starred": "Starred", "shared": "Shared with me", "recent": "Recent", "trash": "Trash"}
+
+
+class FolderCreatePayload(BaseModel):
+    name: str
+    parent_id: int | None = None
+
+
+class FolderRenamePayload(BaseModel):
+    name: str
+
+
+def safe_next_url(url: str | None) -> str:
+    """Only allow same-site, relative redirect targets to avoid open redirects."""
+    if not url or not url.startswith("/") or url.startswith("//") or url.startswith("/\\"):
+        return "/"
+    return url
 
 
 def format_bytes(num: int | None) -> str:
@@ -98,7 +115,7 @@ def require_page(request: Request, *, auth_password: str, auth_repo: AuthReposit
         raise RedirectRequest("/login")
 
 
-def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None, *, auth_password: str = "", auth_username: str = "admin", auth_repository: AuthRepository | None = None, session_ttl_days: int = 30, secure_cookie: bool = True, sync_cooldown_seconds: int = 60) -> FastAPI:
+def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewRenderer | None = None, *, auth_password: str = "", auth_username: str = "admin", auth_repository: AuthRepository | None = None, session_ttl_days: int = 30, secure_cookie: bool = True, sync_cooldown_seconds: int = 60, max_upload_bytes: int = 2 * 1024 * 1024 * 1024) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
     renderer = preview_renderer or PreviewRenderer(Path(".data") / "previews")
     templates = Jinja2Templates(directory=str(Path(__file__).parent / "templates"))
@@ -125,20 +142,20 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     def login_page(request: Request):
         if not auth_password:
             return RedirectResponse("/", status_code=303)
-        return templates.TemplateResponse(request, "login.html", {"error": None, "next": request.query_params.get("next", "/")})
+        return templates.TemplateResponse(request, "login.html", {"error": None, "next": safe_next_url(request.query_params.get("next"))})
 
     @app.post("/login")
     async def login_submit(request: Request):
         form = await request.form()
         username = form.get("username", "")
         password = form.get("password", "")
-        next_url = form.get("next", "/")
+        next_url = safe_next_url(form.get("next"))
         if not auth_password:
-            return RedirectResponse(next_url or "/", status_code=303)
+            return RedirectResponse(next_url, status_code=303)
         stored_hash = auth.get_user_hash(auth_username)
         if username == auth_username and stored_hash and verify_password(password, stored_hash):
             token = auth.create_session(username=auth_username, ttl=timedelta(days=session_ttl_days))
-            response = RedirectResponse(next_url or "/", status_code=303)
+            response = RedirectResponse(next_url, status_code=303)
             response.set_cookie("tgs3_session", token, httponly=True, samesite="lax", secure=secure_cookie, max_age=session_ttl_days * 86400)
             return response
         return templates.TemplateResponse(request, "login.html", {"error": "Invalid username or password", "next": next_url}, status_code=401)
@@ -204,9 +221,17 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     @app.post("/files/upload", status_code=201)
     async def upload(request: Request, file: UploadFile = File(...), folder_id: int | None = None):
         require_auth_route(request)
-        stored = await service.upload_bytes(
+        size_bytes = file.size
+        if size_bytes is None:
+            file.file.seek(0, os.SEEK_END)
+            size_bytes = file.file.tell()
+            file.file.seek(0)
+        if size_bytes > max_upload_bytes:
+            raise HTTPException(status_code=413, detail=f"File too large. Maximum allowed size is {max_upload_bytes} bytes.")
+        stored = await service.upload_stream(
             filename=file.filename or "upload.bin",
-            content=await file.read(),
+            file_obj=file.file,
+            size_bytes=size_bytes,
             mime_type=file.content_type,
             folder_id=folder_id,
         )
@@ -240,21 +265,21 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         return build_folder_tree(service.list_folders())
 
     @app.post("/folders", status_code=201)
-    def create_folder(request: Request, payload: dict):
+    def create_folder(request: Request, payload: FolderCreatePayload):
         require_auth_route(request)
         try:
-            folder = service.create_folder(name=payload.get("name"), parent_id=payload.get("parent_id"))
+            folder = service.create_folder(name=payload.name, parent_id=payload.parent_id)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return JSONResponse(serialize_folder(folder), status_code=201)
 
     @app.patch("/folders/{folder_id}")
-    def rename_folder(request: Request, folder_id: int, payload: dict):
+    def rename_folder(request: Request, folder_id: int, payload: FolderRenamePayload):
         require_auth_route(request)
         if service.get_folder(folder_id) is None:
             raise HTTPException(status_code=404, detail=f"folder {folder_id} not found")
         try:
-            folder = service.rename_folder(folder_id, payload.get("name"))
+            folder = service.rename_folder(folder_id, payload.name)
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
         return serialize_folder(folder)
@@ -334,7 +359,10 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
     @app.get("/files/{file_id}/download")
     async def download_file(request: Request, file_id: int):
         require_auth_route(request)
-        downloaded = await service.download_file(file_id)
+        try:
+            downloaded = await service.download_file(file_id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         return Response(
             content=downloaded.content,
             media_type=downloaded.mime_type or "application/octet-stream",
@@ -385,7 +413,10 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         stored = service.get_shared_file(token)
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")
-        downloaded = await service.download_file(stored.id)
+        try:
+            downloaded = await service.download_file(stored.id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         return Response(
             content=downloaded.content,
             media_type=downloaded.mime_type or "application/octet-stream",
@@ -397,7 +428,10 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         stored = service.get_shared_file(token)
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")
-        downloaded = await service.download_file(stored.id)
+        try:
+            downloaded = await service.download_file(stored.id)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
         # We use inline so that bots/browsers can display or parse it directly
         return Response(
             content=downloaded.content,
@@ -530,4 +564,5 @@ def create_app(telegram_storage: TelegramStorage | None = None) -> FastAPI:
         session_ttl_days=settings.session_ttl_days,
         secure_cookie=settings.secure_cookie,
         sync_cooldown_seconds=settings.sync_cooldown_seconds,
+        max_upload_bytes=settings.max_upload_bytes,
     )

@@ -1,3 +1,6 @@
+from io import BytesIO
+from typing import BinaryIO
+
 from app.repository import FileRepository
 from app.telegram_bridge import DownloadedTelegramFile, TelegramStorage
 
@@ -8,15 +11,15 @@ class StorageService:
         self._telegram = telegram
         self._channel_id = channel_id
 
-    async def upload_bytes(self, *, filename: str, content: bytes, mime_type: str | None, folder_id: int | None = None):
-        stored = self._repository.create_uploading(name=filename, size_bytes=len(content), mime_type=mime_type)
+    async def upload_stream(self, *, filename: str, file_obj: BinaryIO, size_bytes: int, mime_type: str | None, folder_id: int | None = None):
+        stored = self._repository.create_uploading(name=filename, size_bytes=size_bytes, mime_type=mime_type)
         if folder_id is not None:
             self._repository.move_file(file_id=stored.id, folder_id=folder_id)
         try:
             uploaded = await self._telegram.upload(
                 channel_id=self._channel_id,
                 filename=filename,
-                content=content,
+                content=file_obj,
                 mime_type=mime_type,
             )
             self._repository.mark_ready(
@@ -29,6 +32,15 @@ class StorageService:
             self._repository.mark_failed(stored.id)
             raise
         return self._repository.get_file(stored.id)
+
+    async def upload_bytes(self, *, filename: str, content: bytes, mime_type: str | None, folder_id: int | None = None):
+        return await self.upload_stream(
+            filename=filename,
+            file_obj=BytesIO(content),
+            size_bytes=len(content),
+            mime_type=mime_type,
+            folder_id=folder_id,
+        )
 
     def list_files(self, folder_id: int | None = None):
         return self._repository.list_files(folder_id)

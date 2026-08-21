@@ -1,6 +1,24 @@
-from app.main import create_app
+import sqlite3
+from pathlib import Path
+
+from app.db import ensure_schema
+from app.main import build_app, create_app
+from app.previews import PreviewRenderer
+from app.repository import FileRepository
+from app.service import StorageService
 from fastapi.testclient import TestClient
 from tests.fakes import FakeTelegramStorage
+
+
+def _build_client(tmp_path: Path, *, max_upload_bytes: int = 2 * 1024 * 1024 * 1024) -> tuple[TestClient, FileRepository]:
+    connection = sqlite3.connect(tmp_path / "files.db", check_same_thread=False)
+    connection.row_factory = sqlite3.Row
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+    telegram = FakeTelegramStorage(message_id=1, file_id="tg-1")
+    service = StorageService(repository, telegram, channel_id=-10055)
+    app = build_app(service, preview_renderer=PreviewRenderer(tmp_path / "previews"), max_upload_bytes=max_upload_bytes)
+    return TestClient(app), repository
 
 
 def test_dashboard_renders_existing_files(app_client: TestClient):
@@ -271,4 +289,56 @@ def test_index_page_renders_each_view(app_client: TestClient):
     for view in ("home", "starred", "shared", "recent", "trash"):
         res = app_client.get(f"/?view={view}")
         assert res.status_code == 200
+
+
+def test_upload_over_size_limit_returns_413(tmp_path):
+    client, _ = _build_client(tmp_path, max_upload_bytes=10)
+
+    response = client.post(
+        "/files/upload",
+        files={"file": ("big.bin", b"x" * 11, "application/octet-stream")},
+    )
+
+    assert response.status_code == 413
+
+
+def test_upload_within_size_limit_succeeds(tmp_path):
+    client, _ = _build_client(tmp_path, max_upload_bytes=10)
+
+    response = client.post(
+        "/files/upload",
+        files={"file": ("small.bin", b"x" * 5, "application/octet-stream")},
+    )
+
+    assert response.status_code == 201
+
+
+def test_download_missing_telegram_message_returns_404(tmp_path):
+    client, repository = _build_client(tmp_path)
+    stored = repository.create_uploading(name="ghost.txt", size_bytes=3, mime_type="text/plain")
+
+    response = client.get(f"/files/{stored.id}/download")
+
+    assert response.status_code == 404
+
+
+def test_shared_download_missing_telegram_message_returns_404(tmp_path):
+    client, repository = _build_client(tmp_path)
+    stored = repository.create_uploading(name="ghost.txt", size_bytes=3, mime_type="text/plain")
+    repository.set_share_token(stored.id, True)
+    shared = repository.get_file(stored.id)
+
+    assert client.get(f"/s/{shared.share_token}/download").status_code == 404
+    assert client.get(f"/s/{shared.share_token}/{shared.name}").status_code == 404
+
+
+def test_create_folder_missing_name_returns_422(app_client: TestClient):
+    response = app_client.post("/folders", json={"parent_id": None})
+    assert response.status_code == 422
+
+
+def test_rename_folder_missing_name_returns_422(app_client: TestClient):
+    created = app_client.post("/folders", json={"name": "Old", "parent_id": None}).json()
+    response = app_client.patch(f"/folders/{created['id']}", json={})
+    assert response.status_code == 422
 

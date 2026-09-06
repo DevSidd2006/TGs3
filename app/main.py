@@ -55,6 +55,10 @@ class FolderRenamePayload(BaseModel):
     name: str
 
 
+class FileRenamePayload(BaseModel):
+    name: str
+
+
 def safe_next_url(url: str | None) -> str:
     """Only allow same-site, relative redirect targets to avoid open redirects."""
     if not url or not url.startswith("/") or url.startswith("//") or url.startswith("/\\"):
@@ -300,6 +304,18 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         if folder is None:
             raise HTTPException(status_code=404, detail=f"folder {folder_id} not found")
         return serialize_folder(folder)
+
+    @app.patch("/files/{file_id}")
+    @app.post("/files/{file_id}/rename")
+    def rename_file(request: Request, file_id: int, payload: FileRenamePayload):
+        require_auth_route(request)
+        if service.get_file(file_id) is None:
+            raise HTTPException(status_code=404, detail=f"file {file_id} not found")
+        try:
+            stored = service.rename_file(file_id, payload.name)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return serialize_file(stored)
 
     @app.post("/files/{file_id}/move")
     def move_file(request: Request, file_id: int, payload: dict):

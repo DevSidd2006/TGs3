@@ -63,6 +63,9 @@ class StorageService:
     def move_file(self, *, file_id: int, folder_id: int | None):
         return self._repository.move_file(file_id=file_id, folder_id=folder_id)
 
+    def rename_file(self, file_id: int, name: str):
+        return self._repository.rename_file(file_id, name)
+
     def get_breadcrumb(self, folder_id: int):
         return self._repository.get_breadcrumb(folder_id)
 

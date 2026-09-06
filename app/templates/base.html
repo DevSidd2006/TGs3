@@ -46,6 +46,23 @@
       </div>
     </div>
     
+    <!-- File Rename Modal -->
+    <div id="file-rename-modal" class="preview-overlay" hidden>
+      <div class="modal-card">
+        <div class="modal-header">
+          <span class="modal-title">Rename</span>
+          <button id="file-rename-modal-close" class="icon-btn" title="Close"><i class="ph-bold ph-x"></i></button>
+        </div>
+        <div class="modal-body">
+          <input id="file-rename-modal-name" class="modal-input" type="text" placeholder="Enter file name">
+          <div class="modal-actions">
+            <button id="file-rename-modal-cancel" class="btn-flat">Cancel</button>
+            <button id="file-rename-modal-save" class="btn-solid-blue">OK</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <script src="/static/app.js?v=15"></script>
   </body>
 </html>

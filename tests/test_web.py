@@ -342,3 +342,59 @@ def test_rename_folder_missing_name_returns_422(app_client: TestClient):
     response = app_client.patch(f"/folders/{created['id']}", json={})
     assert response.status_code == 422
 
+
+def test_rename_file_patch_endpoint(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("original.txt", b"content", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    res = app_client.patch(f"/files/{file_id}", json={"name": "renamed.txt"})
+    assert res.status_code == 200
+    assert res.json()["name"] == "renamed.txt"
+    assert res.json()["id"] == file_id
+
+    detail = app_client.get(f"/files/{file_id}")
+    assert detail.status_code == 200
+    assert detail.json()["name"] == "renamed.txt"
+
+
+def test_rename_file_post_endpoint(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("orig_post.txt", b"content", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    res = app_client.post(f"/files/{file_id}/rename", json={"name": "post_renamed.txt"})
+    assert res.status_code == 200
+    assert res.json()["name"] == "post_renamed.txt"
+
+
+def test_rename_file_not_found_returns_404(app_client: TestClient):
+    res = app_client.patch("/files/999999", json={"name": "ghost.txt"})
+    assert res.status_code == 404
+
+
+def test_rename_file_empty_name_returns_400(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("valid.txt", b"content", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    res = app_client.patch(f"/files/{file_id}", json={"name": "   "})
+    assert res.status_code == 400
+
+
+def test_rename_file_missing_name_returns_422(app_client: TestClient):
+    upload = app_client.post(
+        "/files/upload",
+        files={"file": ("valid.txt", b"content", "text/plain")},
+    )
+    file_id = upload.json()["id"]
+
+    res = app_client.patch(f"/files/{file_id}", json={})
+    assert res.status_code == 422
+

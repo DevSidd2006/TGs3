@@ -38,6 +38,8 @@ def test_unauthenticated_api_returns_401(tmp_path):
     client, _ = make_client(tmp_path)
     response = client.get("/files")
     assert response.status_code == 401
+    assert client.patch("/files/1", json={"name": "new.txt"}).status_code == 401
+    assert client.post("/files/1/rename", json={"name": "new.txt"}).status_code == 401
 
 
 def test_login_success_sets_session_cookie(tmp_path):

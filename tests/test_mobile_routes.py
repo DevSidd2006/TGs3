@@ -26,6 +26,7 @@ def test_mobile_page_served(tmp_path):
     response = client.get("/mobile")
     assert response.status_code == 200
     assert "TGS3" in response.text
+    assert "m-action-rename" in response.text
 
 
 def test_manifest_served(tmp_path):

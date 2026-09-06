@@ -3,6 +3,7 @@ let allFilesCache = [];
 let allFoldersCache = [];
 let viewMode = 'list';
 let selectedFileId = null;
+let selectedFileName = null;
 let activeTab = 'home';
 
 function escapeHtml(value) {
@@ -274,12 +275,14 @@ function closeCreateModal() {
 
 function openOptionsModal(fileId, fileName) {
   selectedFileId = fileId;
+  selectedFileName = fileName;
   document.getElementById("m-options-title").textContent = fileName || "File Options";
   document.getElementById("m-options-modal").hidden = false;
 }
 function closeOptionsModal() {
   document.getElementById("m-options-modal").hidden = true;
   selectedFileId = null;
+  selectedFileName = null;
 }
 
 async function promptCreateFolder() {
@@ -378,6 +381,30 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   document.getElementById("m-action-download")?.addEventListener("click", () => {
     if (selectedFileId) window.location.href = `/files/${selectedFileId}/download`;
+  });
+  document.getElementById("m-action-rename")?.addEventListener("click", async () => {
+    if (!selectedFileId) return;
+    const fileId = selectedFileId;
+    const currentName = selectedFileName || "";
+    closeOptionsModal();
+    const newName = window.prompt("Rename file:", currentName);
+    if (!newName || !newName.trim() || newName.trim() === currentName) return;
+    try {
+      const res = await fetch(`/files/${fileId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newName.trim() }),
+      });
+      if (res.ok) {
+        showToast("File renamed");
+        await refreshFiles();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        showToast(err.detail || "Failed to rename file");
+      }
+    } catch (err) {
+      showToast("Error renaming file");
+    }
   });
   document.getElementById("m-action-logout")?.addEventListener("click", async () => {
     await fetch("/logout", { method: "POST" });

@@ -221,6 +221,7 @@
             <button class="icon-btn" id="selection-delete-forever" title="Delete forever"><i class="ph-bold ph-trash"></i></button>
             {% else %}
             <button class="icon-btn" id="selection-star" title="Star"><i class="ph-bold ph-star"></i></button>
+            <button class="icon-btn" id="selection-rename" title="Rename" hidden><i class="ph-bold ph-pencil-simple"></i></button>
             <button class="icon-btn" id="selection-move" title="Move"><i class="ph-bold ph-folder-notch"></i></button>
             <button class="icon-btn" id="selection-download" title="Download"><i class="ph-bold ph-download-simple"></i></button>
             <button class="icon-btn" id="selection-trash" title="Move to trash"><i class="ph-bold ph-trash"></i></button>
@@ -267,6 +268,7 @@
                       {% else %}
                       <button class="preview-trigger" data-id="{{ file.id }}" data-mime="{{ file.mime_type or '' }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-eye"></i> Preview</button>
                       <button class="star-trigger" data-id="{{ file.id }}" data-starred="{{ 'true' if file.starred else 'false' }}"><i class="ph-bold ph-star"></i> {{ 'Unstar' if file.starred else 'Star' }}</button>
+                      <button class="file-rename-trigger" data-id="{{ file.id }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-pencil-simple"></i> Rename</button>
                       <button class="move-trigger" data-id="{{ file.id }}"><i class="ph-bold ph-folder-notch"></i> Move</button>
                       <button class="share-trigger" data-id="{{ file.id }}" data-token="{{ file.share_token or '' }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-share-network"></i> Share</button>
                       <a href="/files/{{ file.id }}/download"><i class="ph-bold ph-download-simple"></i> Download</a>

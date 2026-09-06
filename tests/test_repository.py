@@ -254,3 +254,42 @@ def test_upsert_synced_file_updates_existing_row(tmp_path: Path):
     assert len(files) == 1
     assert files[0].name == "report-v2.pdf"
     assert files[0].telegram_file_id == "file_42_new"
+
+
+def test_rename_file(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+
+    file = repository.create_uploading(name="old_name.txt", size_bytes=10, mime_type="text/plain")
+    renamed = repository.rename_file(file.id, "new_name.txt")
+
+    assert renamed.name == "new_name.txt"
+    assert repository.get_file(file.id).name == "new_name.txt"
+
+
+def test_rename_file_empty_name_raises(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+
+    file = repository.create_uploading(name="file.txt", size_bytes=10, mime_type="text/plain")
+    try:
+        repository.rename_file(file.id, "   ")
+    except ValueError as exc:
+        assert "must not be empty" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")
+
+
+def test_rename_file_not_found_raises(tmp_path: Path):
+    connection = connect_db(tmp_path / "files.db")
+    ensure_schema(connection)
+    repository = FileRepository(connection)
+
+    try:
+        repository.rename_file(99999, "new.txt")
+    except ValueError as exc:
+        assert "not found" in str(exc)
+    else:
+        raise AssertionError("expected ValueError")

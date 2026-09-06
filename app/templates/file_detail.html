@@ -16,6 +16,7 @@
         <div id="immersiveMenu" class="dropdown-content">
           {% if file.status == 'ready' %}
             <a href="/files/{{ file.id }}/download"><i class="ph-bold ph-download-simple"></i> Download</a>
+            <button class="file-rename-trigger-immersive" data-id="{{ file.id }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-pencil-simple"></i> Rename</button>
             <button class="share-trigger-immersive" data-id="{{ file.id }}" data-token="{{ file.share_token or '' }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-share-network"></i> Share</button>
           {% else %}
             <button disabled style="opacity: 0.5;"><i class="ph-bold ph-clock"></i> Processing...</button>

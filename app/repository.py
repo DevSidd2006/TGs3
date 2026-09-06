@@ -219,6 +219,19 @@ class FileRepository:
         assert moved is not None
         return moved
 
+    def rename_file(self, file_id: int, name: str) -> StoredFile:
+        name = name.strip()
+        if not name:
+            raise ValueError("file name must not be empty")
+        file = self.get_file(file_id)
+        if file is None:
+            raise ValueError(f"file {file_id} not found")
+        self._connection.execute("UPDATE files SET name = ? WHERE id = ?", (name, file_id))
+        self._connection.commit()
+        updated = self.get_file(file_id)
+        assert updated is not None
+        return updated
+
     def get_breadcrumb(self, folder_id: int) -> list[Folder]:
         chain: list[Folder] = []
         current = folder_id

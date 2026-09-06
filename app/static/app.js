@@ -9,6 +9,7 @@ let folderModalMode = null;
 let folderModalParent = null;
 let moveFileIds = [];
 let shareFileId = null;
+let renameTargetFileId = null;
 let selectedIds = new Set();
 
 function escapeHtml(value) {
@@ -137,6 +138,7 @@ function buildFileActionsMenu(file) {
   return `
     <button class="preview-trigger" data-id="${id}" data-mime="${escapeHtml(file.mime_type || '')}" data-name="${escapeHtml(file.name)}"><i class="ph-bold ph-eye"></i> Preview</button>
     <button class="star-trigger" data-id="${id}" data-starred="${file.starred ? 'true' : 'false'}"><i class="ph-bold ph-star"></i> ${file.starred ? 'Unstar' : 'Star'}</button>
+    <button class="file-rename-trigger" data-id="${id}" data-name="${escapeHtml(file.name)}"><i class="ph-bold ph-pencil-simple"></i> Rename</button>
     <button class="move-trigger" data-id="${id}"><i class="ph-bold ph-folder-notch"></i> Move</button>
     <button class="share-trigger" data-id="${id}" data-token="${escapeHtml(file.share_token || '')}" data-name="${escapeHtml(file.name)}"><i class="ph-bold ph-share-network"></i> Share</button>
     <a href="/files/${id}/download"><i class="ph-bold ph-download-simple"></i> Download</a>
@@ -317,6 +319,8 @@ function updateSelectionUI() {
   toolbar.hidden = count === 0;
   if (normalBar) normalBar.hidden = count > 0;
   if (countEl) countEl.textContent = `${count} selected`;
+  const renameBtn = document.getElementById('selection-rename');
+  if (renameBtn) renameBtn.hidden = count !== 1;
 
   const selectAll = document.getElementById('select-all-checkbox');
   if (selectAll) {
@@ -417,6 +421,8 @@ function handleFileTriggerClick(e) {
   if (share) { closeContextMenu(); return openShareModal(share.dataset.id, share.dataset.token, share.dataset.name); }
   const star = e.target.closest(".star-trigger");
   if (star) { closeContextMenu(); return handleStarToggle(star.dataset.id, star.dataset.starred === "true"); }
+  const rename = e.target.closest(".file-rename-trigger");
+  if (rename) { closeContextMenu(); return openRenameFileModal(rename.dataset.id, rename.dataset.name); }
   const trash = e.target.closest(".trash-trigger");
   if (trash) { closeContextMenu(); return handleTrash(trash.dataset.id); }
   const restore = e.target.closest(".restore-trigger");
@@ -675,6 +681,71 @@ async function saveMove() {
   }
 }
 
+function openRenameFileModal(fileId, currentName) {
+  renameTargetFileId = fileId;
+  const input = document.getElementById("file-rename-modal-name");
+  const modal = document.getElementById("file-rename-modal");
+  if (!input || !modal) return;
+  input.value = currentName || "";
+  modal.hidden = false;
+  input.focus();
+  const lastDot = (currentName || "").lastIndexOf(".");
+  if (lastDot > 0) {
+    input.setSelectionRange(0, lastDot);
+  } else {
+    input.select();
+  }
+}
+
+function closeRenameFileModal() {
+  const modal = document.getElementById("file-rename-modal");
+  if (modal) modal.hidden = true;
+  renameTargetFileId = null;
+}
+
+async function saveFileRename() {
+  if (!renameTargetFileId) return;
+  const input = document.getElementById("file-rename-modal-name");
+  if (!input) return;
+  const newName = input.value.trim();
+  if (!newName) {
+    alert("File name must not be empty.");
+    return;
+  }
+  try {
+    const res = await fetch(`/files/${renameTargetFileId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName }),
+    });
+    if (res.ok) {
+      const updated = await res.json();
+      closeRenameFileModal();
+      if (typeof allFilesCache !== "undefined") {
+        const idx = allFilesCache.findIndex(f => f.id === updated.id);
+        if (idx >= 0) allFilesCache[idx] = updated;
+      }
+      const titleEl = document.querySelector(".immersive-header .file-name");
+      if (titleEl) {
+        titleEl.textContent = updated.name;
+        document.title = `${updated.name} - TGS3`;
+        const rBtn = document.querySelector(".file-rename-trigger-immersive");
+        if (rBtn) rBtn.dataset.name = updated.name;
+        const sBtn = document.querySelector(".share-trigger-immersive");
+        if (sBtn) sBtn.dataset.name = updated.name;
+      }
+      if (typeof refreshFiles === "function" && document.querySelector(".drive-app")) {
+        await refreshFiles();
+      }
+    } else {
+      const err = await res.json().catch(() => ({}));
+      alert(err.detail || "Failed to rename file.");
+    }
+  } catch (err) {
+    alert(err.message || "Failed to rename file.");
+  }
+}
+
 function openFolderModal(mode, parentId) {
   folderModalMode = mode;
   folderModalParent = parentId ?? null;
@@ -837,6 +908,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("theme-toggle-btn-immersive")?.addEventListener("click", toggleTheme);
   document.getElementById("immersive-menu-trigger")?.addEventListener("click", (e) => toggleDropdown(e, "immersiveMenu"));
   document.getElementById("immersiveMenu")?.addEventListener("click", (e) => {
+    const rename = e.target.closest(".file-rename-trigger-immersive");
+    if (rename) return openRenameFileModal(rename.dataset.id, rename.dataset.name);
     const share = e.target.closest(".share-trigger-immersive");
     if (share) return openShareModal(share.dataset.id, share.dataset.token, share.dataset.name);
   });
@@ -983,6 +1056,12 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("select-all-checkbox")?.addEventListener("change", (e) => toggleSelectAll(e.target.checked));
   document.getElementById("selection-clear")?.addEventListener("click", clearSelection);
   document.getElementById("selection-star")?.addEventListener("click", () => bulkAction((id) => starFileApi(id, true)));
+  document.getElementById("selection-rename")?.addEventListener("click", () => {
+    if (selectedIds.size !== 1) return;
+    const id = Array.from(selectedIds)[0];
+    const file = allFilesCache.find(f => String(f.id) === String(id));
+    openRenameFileModal(id, file ? file.name : "");
+  });
   document.getElementById("selection-move")?.addEventListener("click", () => openMoveModal(null, Array.from(selectedIds)));
   document.getElementById("selection-download")?.addEventListener("click", bulkDownload);
   document.getElementById("selection-trash")?.addEventListener("click", () => {
@@ -1042,8 +1121,17 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("preview-overlay")?.addEventListener("click", (e) => {
     if (e.target === e.currentTarget) closePreview();
   });
+  document.getElementById("file-rename-modal-close")?.addEventListener("click", closeRenameFileModal);
+  document.getElementById("file-rename-modal-cancel")?.addEventListener("click", closeRenameFileModal);
+  document.getElementById("file-rename-modal-save")?.addEventListener("click", saveFileRename);
+  document.getElementById("file-rename-modal-name")?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") saveFileRename();
+  });
+  document.getElementById("file-rename-modal")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) closeRenameFileModal();
+  });
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") { closePreview(); closeContextMenu(); }
+    if (e.key === "Escape") { closePreview(); closeContextMenu(); closeRenameFileModal(); }
   });
   document.querySelector(".drive-main-workspace")?.addEventListener("scroll", closeContextMenu);
   window.addEventListener("resize", closeContextMenu);

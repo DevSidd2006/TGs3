@@ -1086,6 +1086,89 @@ body {
   color: #c5221f;
 }
 
+.chain-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: #e8f0fe;
+  color: #185abc;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.chain-registered,
+.chain-confirmed {
+  background: #e6f4ea;
+  color: #1e8e3e;
+}
+
+.chain-pending,
+.chain-not_submitted {
+  background: #fef7e0;
+  color: #b06000;
+}
+
+.chain-failed,
+.chain-chain_failed {
+  background: #fce8e6;
+  color: #c5221f;
+}
+
+.chain-deleted,
+.chain-revoked {
+  background: #f1f3f4;
+  color: #5f6368;
+}
+
+.wallet-connected {
+  background: #e6f4ea;
+  color: #1e8e3e;
+}
+
+.chain-evidence-panel {
+  border-bottom: 1px solid var(--border-color, #dadce0);
+  background: var(--surface, #fff);
+  padding: 14px 24px;
+}
+
+.chain-evidence-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary);
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.chain-evidence-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.chain-evidence-grid div {
+  min-width: 0;
+}
+
+.chain-evidence-grid dt {
+  color: var(--text-secondary);
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.chain-evidence-grid dd {
+  color: var(--text-primary);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 [data-theme="dark"] .status-ready {
   background: rgba(30, 142, 62, 0.18);
   color: #81c995;

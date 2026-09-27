@@ -16,11 +16,13 @@ from telethon.sessions import StringSession
 
 
 from app.auth import hash_password, verify_password
+from app.blockchain import BlockchainError, TransactionEvidence, Web3FileRegistryGateway
 from app.config import load_settings
+from app.crypto import decode_master_key
 from app.db import connect_db, ensure_schema
 from app.previews import PreviewRenderer
 from app.repository import AuthRepository, FileRepository
-from app.service import StorageService
+from app.service import BlockchainAuthorizationError, BlockchainIntegrityError, StorageService
 from app.telegram_bridge import TelegramStorage, TelethonStorage
 
 
@@ -36,7 +38,28 @@ def serialize_file(stored) -> dict:
         "share_token": getattr(stored, "share_token", None),
         "starred": getattr(stored, "starred", False),
         "deleted_at": getattr(stored, "deleted_at", None),
+        "blockchain_file_id": getattr(stored, "blockchain_file_id", None),
+        "content_hash": getattr(stored, "content_hash", None),
+        "storage_state": getattr(stored, "storage_state", "pending"),
+        "chain_state": getattr(stored, "chain_state", "not_submitted"),
+        "register_tx_hash": getattr(stored, "register_tx_hash", None),
+        "register_block_number": getattr(stored, "register_block_number", None),
+        "owner_wallet": getattr(stored, "owner_wallet", None),
     }
+
+
+def serialize_transaction_evidence(evidence: TransactionEvidence) -> dict:
+    return {
+        "tx_hash": evidence.tx_hash,
+        "block_number": evidence.block_number,
+        "status": evidence.status,
+    }
+
+
+def serialize_blockchain_status(stored, *, access_allowed: bool | None = None) -> dict:
+    payload = serialize_file(stored)
+    payload["access_allowed"] = access_allowed
+    return payload
 
 
 def serialize_folder(folder) -> dict:
@@ -57,6 +80,20 @@ class FolderRenamePayload(BaseModel):
 
 class FileRenamePayload(BaseModel):
     name: str
+
+
+class BlockchainRegisterPayload(BaseModel):
+    tx_hash: str
+
+
+class BlockchainGrantPayload(BaseModel):
+    owner_wallet: str
+    recipient_wallet: str
+    tx_hash: str
+
+
+class BlockchainVerifyPayload(BaseModel):
+    wallet_address: str | None = None
 
 
 def safe_next_url(url: str | None) -> str:
@@ -223,7 +260,7 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         )
 
     @app.post("/files/upload", status_code=201)
-    async def upload(request: Request, file: UploadFile = File(...), folder_id: int | None = None):
+    async def upload(request: Request, file: UploadFile = File(...), folder_id: int | None = None, owner_wallet: str | None = None):
         require_auth_route(request)
         size_bytes = file.size
         if size_bytes is None:
@@ -232,13 +269,17 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
             file.file.seek(0)
         if size_bytes > max_upload_bytes:
             raise HTTPException(status_code=413, detail=f"File too large. Maximum allowed size is {max_upload_bytes} bytes.")
-        stored = await service.upload_stream(
-            filename=file.filename or "upload.bin",
-            file_obj=file.file,
-            size_bytes=size_bytes,
-            mime_type=file.content_type,
-            folder_id=folder_id,
-        )
+        try:
+            stored = await service.upload_stream(
+                filename=file.filename or "upload.bin",
+                file_obj=file.file,
+                size_bytes=size_bytes,
+                mime_type=file.content_type,
+                folder_id=folder_id,
+                owner_wallet=owner_wallet,
+            )
+        except BlockchainAuthorizationError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
         return JSONResponse(serialize_file(stored), status_code=201)
 
     @app.get("/files")
@@ -372,13 +413,90 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
             raise HTTPException(status_code=404, detail="file not found")
         return serialize_file(stored)
 
-    @app.get("/files/{file_id}/download")
-    async def download_file(request: Request, file_id: int):
+    @app.get("/files/{file_id}/blockchain")
+    def blockchain_status(request: Request, file_id: int, wallet_address: str | None = None):
         require_auth_route(request)
         try:
-            downloaded = await service.download_file(file_id)
+            status = service.get_blockchain_status(file_id=file_id, wallet_address=wallet_address)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BlockchainError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return serialize_blockchain_status(status["file"], access_allowed=status["access_allowed"])
+
+    @app.post("/files/{file_id}/blockchain/register")
+    def finalize_blockchain_registration(request: Request, file_id: int, payload: BlockchainRegisterPayload):
+        require_auth_route(request)
+        try:
+            stored = service.finalize_registration(file_id=file_id, tx_hash=payload.tx_hash)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (ValueError, BlockchainError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return serialize_file(stored)
+
+    @app.post("/files/{file_id}/blockchain/grant")
+    def grant_blockchain_access(request: Request, file_id: int, payload: BlockchainGrantPayload):
+        require_auth_route(request)
+        try:
+            stored, evidence = service.grant_access(
+                file_id=file_id,
+                owner_wallet=payload.owner_wallet,
+                recipient_wallet=payload.recipient_wallet,
+                tx_hash=payload.tx_hash,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (ValueError, BlockchainError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "file": serialize_file(stored),
+            "transaction": serialize_transaction_evidence(evidence),
+        }
+
+    @app.post("/files/{file_id}/blockchain/revoke")
+    def revoke_blockchain_access(request: Request, file_id: int, payload: BlockchainGrantPayload):
+        require_auth_route(request)
+        try:
+            stored, evidence = service.revoke_access(
+                file_id=file_id,
+                owner_wallet=payload.owner_wallet,
+                recipient_wallet=payload.recipient_wallet,
+                tx_hash=payload.tx_hash,
+            )
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except (ValueError, BlockchainError) as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return {
+            "file": serialize_file(stored),
+            "transaction": serialize_transaction_evidence(evidence),
+        }
+
+    @app.post("/files/{file_id}/blockchain/verify")
+    async def verify_blockchain_integrity(request: Request, file_id: int, payload: BlockchainVerifyPayload):
+        require_auth_route(request)
+        try:
+            verified = await service.verify_integrity(file_id=file_id, wallet_address=payload.wallet_address)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BlockchainAuthorizationError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except BlockchainIntegrityError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"verified": verified}
+
+    @app.get("/files/{file_id}/download")
+    async def download_file(request: Request, file_id: int, wallet_address: str | None = None):
+        require_auth_route(request)
+        try:
+            downloaded = await service.download_file(file_id, wallet_address=wallet_address)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BlockchainAuthorizationError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except BlockchainIntegrityError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         return Response(
             content=downloaded.content,
             media_type=downloaded.mime_type or "application/octet-stream",
@@ -386,15 +504,19 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         )
 
     @app.get("/files/{file_id}/preview")
-    async def preview_file(request: Request, file_id: int):
+    async def preview_file(request: Request, file_id: int, wallet_address: str | None = None):
         require_auth_route(request)
         stored = service.get_file(file_id)
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")
         try:
-            downloaded = await service.download_file(file_id)
+            downloaded = await service.download_file(file_id, wallet_address=wallet_address)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BlockchainAuthorizationError as exc:
+            raise HTTPException(status_code=403, detail=str(exc)) from exc
+        except BlockchainIntegrityError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         preview = renderer.render(file_id=file_id, downloaded=downloaded)
         if preview is None:
             raise HTTPException(status_code=415, detail="no preview available for this file type")
@@ -430,9 +552,11 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")
         try:
-            downloaded = await service.download_file(stored.id)
+            downloaded = await service.download_file(stored.id, public_link=True)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BlockchainIntegrityError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         return Response(
             content=downloaded.content,
             media_type=downloaded.mime_type or "application/octet-stream",
@@ -445,9 +569,11 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")
         try:
-            downloaded = await service.download_file(stored.id)
+            downloaded = await service.download_file(stored.id, public_link=True)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BlockchainIntegrityError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         # We use inline so that bots/browsers can display or parse it directly
         return Response(
             content=downloaded.content,
@@ -461,9 +587,11 @@ def build_app(service: StorageService, lifespan=None, preview_renderer: PreviewR
         if stored is None:
             raise HTTPException(status_code=404, detail="file not found")
         try:
-            downloaded = await service.download_file(stored.id)
+            downloaded = await service.download_file(stored.id, public_link=True)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except BlockchainIntegrityError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         preview = renderer.render(file_id=stored.id, downloaded=downloaded)
         if preview is None:
             raise HTTPException(status_code=415, detail="no preview available for this file type")
@@ -568,8 +696,29 @@ def create_app(telegram_storage: TelegramStorage | None = None) -> FastAPI:
         if client is not None:
             await client.disconnect()
 
+    blockchain = None
+    master_key = None
+    if settings.blockchain_enabled:
+        assert settings.blockchain_rpc_url is not None
+        assert settings.blockchain_contract_address is not None
+        assert settings.blockchain_chain_id is not None
+        assert settings.encryption_master_key is not None
+        blockchain = Web3FileRegistryGateway(
+            rpc_url=settings.blockchain_rpc_url,
+            contract_address=settings.blockchain_contract_address,
+            chain_id=settings.blockchain_chain_id,
+            abi_path=settings.blockchain_abi_path,
+        )
+        master_key = decode_master_key(settings.encryption_master_key)
 
-    service = StorageService(FileRepository(connection), telegram_storage, channel_id=settings.telegram_channel_id)
+    service = StorageService(
+        FileRepository(connection),
+        telegram_storage,
+        channel_id=settings.telegram_channel_id,
+        blockchain=blockchain,
+        master_key=master_key,
+        blockchain_enabled=settings.blockchain_enabled,
+    )
     preview_renderer = PreviewRenderer(settings.database_path.parent / "previews")
     return build_app(
         service,

@@ -11,6 +11,7 @@ let moveFileIds = [];
 let shareFileId = null;
 let renameTargetFileId = null;
 let selectedIds = new Set();
+let connectedWallet = localStorage.getItem('tgs3_wallet') || null;
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (c) => ({
@@ -57,6 +58,13 @@ function getDriveBadgeDetails(mimeType, filename = '') {
 
 function getFileTypeLabel(file) {
   return getDriveBadgeDetails(file.mime_type, file.name).type;
+}
+
+function chainBadgeHtml(file) {
+  if (!file.blockchain_file_id) return '';
+  const state = escapeHtml((file.chain_state || 'not_submitted').replaceAll('_', ' '));
+  const cls = escapeHtml(file.chain_state || 'not_submitted');
+  return `<span class="chain-badge chain-${cls}" title="Blockchain status">${state}</span>`;
 }
 
 function formatDate(iso) {
@@ -141,9 +149,36 @@ function buildFileActionsMenu(file) {
     <button class="file-rename-trigger" data-id="${id}" data-name="${escapeHtml(file.name)}"><i class="ph-bold ph-pencil-simple"></i> Rename</button>
     <button class="move-trigger" data-id="${id}"><i class="ph-bold ph-folder-notch"></i> Move</button>
     <button class="share-trigger" data-id="${id}" data-token="${escapeHtml(file.share_token || '')}" data-name="${escapeHtml(file.name)}"><i class="ph-bold ph-share-network"></i> Share</button>
-    <a href="/files/${id}/download"><i class="ph-bold ph-download-simple"></i> Download</a>
+    <a href="${downloadUrl(id)}"><i class="ph-bold ph-download-simple"></i> Download</a>
     <button class="trash-trigger" data-id="${id}"><i class="ph-bold ph-trash"></i> Move to trash</button>
   `;
+}
+
+function downloadUrl(id) {
+  const wallet = connectedWallet ? `?wallet_address=${encodeURIComponent(connectedWallet)}` : '';
+  return `/files/${id}/download${wallet}`;
+}
+
+function updateWalletButton() {
+  document.querySelectorAll('.wallet-connect-btn').forEach((btn) => {
+    btn.title = connectedWallet ? `Wallet ${connectedWallet}` : 'Connect wallet';
+    btn.classList.toggle('wallet-connected', !!connectedWallet);
+  });
+  const detailDownload = document.getElementById('detail-download-link');
+  if (detailDownload?.dataset.id) {
+    detailDownload.href = downloadUrl(detailDownload.dataset.id);
+  }
+}
+
+async function connectWallet() {
+  if (!window.ethereum || !window.ethereum.request) {
+    alert('No browser wallet found.');
+    return;
+  }
+  const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+  connectedWallet = accounts && accounts[0] ? accounts[0] : null;
+  if (connectedWallet) localStorage.setItem('tgs3_wallet', connectedWallet);
+  updateWalletButton();
 }
 
 function folderMenuHtml(folder, { includeOpen = false } = {}) {
@@ -190,6 +225,7 @@ function renderFileList() {
               </div>
               <a href="/view/files/${file.id}" class="file-title-link" title="${name}">${name}</a>
               ${starIndicator}
+              ${chainBadgeHtml(file)}
             </div>
           </td>
           <td><span class="file-size-text">${formatBytes(file.size_bytes)}</span></td>
@@ -249,6 +285,7 @@ function renderFileList() {
             </div>
           </div>
           <div class="grid-file-title" title="${name}">${name}${starIndicator}</div>
+          ${chainBadgeHtml(file)}
           <div class="grid-file-preview-box">
             <i class="ph-fill ${badge.icon}" style="color: rgba(60,64,67,0.3)"></i>
           </div>
@@ -475,15 +512,19 @@ async function uploadFile(file, folderId = null) {
 
   try {
     const targetFolderId = folderId ?? currentFolderId;
-    const folderParam = targetFolderId ? `?folder_id=${targetFolderId}` : "";
-    const response = await fetch(`/files/upload${folderParam}`, {
+    const params = new URLSearchParams();
+    if (targetFolderId) params.set("folder_id", targetFolderId);
+    if (connectedWallet) params.set("owner_wallet", connectedWallet);
+    const suffix = params.toString() ? `?${params.toString()}` : "";
+    const response = await fetch(`/files/upload${suffix}`, {
       method: "POST",
       body: formData,
     });
     if (response.ok) {
       await refreshFiles();
     } else {
-      alert("Failed to upload file.");
+      const err = await response.json().catch(() => ({}));
+      alert(err.detail || "Failed to upload file.");
     }
   } catch (err) {
     console.error("Upload error:", err);
@@ -904,6 +945,8 @@ async function syncChannel() {
 
 document.addEventListener("DOMContentLoaded", () => {
   initTheme();
+  updateWalletButton();
+  document.querySelectorAll(".wallet-connect-btn").forEach((btn) => btn.addEventListener("click", connectWallet));
   document.getElementById("theme-toggle-btn")?.addEventListener("click", toggleTheme);
   document.getElementById("theme-toggle-btn-immersive")?.addEventListener("click", toggleTheme);
   document.getElementById("immersive-menu-trigger")?.addEventListener("click", (e) => toggleDropdown(e, "immersiveMenu"));

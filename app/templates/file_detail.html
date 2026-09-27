@@ -9,13 +9,14 @@
       <span class="file-name">{{ file.name }}</span>
     </div>
     <div class="right">
+      <button class="icon-btn wallet-connect-btn" id="wallet-connect" title="Connect wallet"><i class="ph-bold ph-wallet"></i></button>
       <div class="dropdown">
         <button class="icon-btn" id="immersive-menu-trigger" title="More actions">
           <i class="ph-bold ph-list"></i>
         </button>
         <div id="immersiveMenu" class="dropdown-content">
           {% if file.status == 'ready' %}
-            <a href="/files/{{ file.id }}/download"><i class="ph-bold ph-download-simple"></i> Download</a>
+            <a href="/files/{{ file.id }}/download" id="detail-download-link" data-id="{{ file.id }}"><i class="ph-bold ph-download-simple"></i> Download</a>
             <button class="file-rename-trigger-immersive" data-id="{{ file.id }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-pencil-simple"></i> Rename</button>
             <button class="share-trigger-immersive" data-id="{{ file.id }}" data-token="{{ file.share_token or '' }}" data-name="{{ file.name | escape }}"><i class="ph-bold ph-share-network"></i> Share</button>
           {% else %}
@@ -27,6 +28,42 @@
       </div>
     </div>
   </header>
+
+  {% if file.blockchain_file_id %}
+  <section class="chain-evidence-panel">
+    <div class="chain-evidence-header">
+      <i class="ph-bold ph-link-simple-horizontal"></i>
+      <span>Blockchain Evidence</span>
+      <span class="chain-badge chain-{{ file.chain_state }}">{{ file.chain_state.replace('_', ' ') }}</span>
+    </div>
+    <dl class="chain-evidence-grid">
+      <div>
+        <dt>File ID</dt>
+        <dd>{{ file.blockchain_file_id }}</dd>
+      </div>
+      <div>
+        <dt>Content Hash</dt>
+        <dd>{{ file.content_hash or 'Pending' }}</dd>
+      </div>
+      <div>
+        <dt>Owner</dt>
+        <dd>{{ file.owner_wallet or 'Pending wallet' }}</dd>
+      </div>
+      <div>
+        <dt>Registration Tx</dt>
+        <dd>{{ file.register_tx_hash or 'Awaiting wallet receipt' }}</dd>
+      </div>
+      <div>
+        <dt>Block</dt>
+        <dd>{{ file.register_block_number or 'Pending' }}</dd>
+      </div>
+      <div>
+        <dt>Storage</dt>
+        <dd>{{ file.storage_state.replace('_', ' ') }}</dd>
+      </div>
+    </dl>
+  </section>
+  {% endif %}
 
   <div class="immersive-content">
     {% if file.status == 'ready' %}

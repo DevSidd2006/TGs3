@@ -32,6 +32,104 @@ class FileRepository:
         self._connection.execute("UPDATE files SET status = 'failed' WHERE id = ?", (file_id,))
         self._connection.commit()
 
+    def mark_storage_ready(
+        self,
+        *,
+        file_id: int,
+        content_hash: str,
+        wrapped_key: str,
+        storage_state: str = "stored",
+    ) -> StoredFile | None:
+        self._connection.execute(
+            """
+            UPDATE files
+            SET content_hash = ?, wrapped_key = ?, storage_state = ?
+            WHERE id = ?
+            """,
+            (content_hash, wrapped_key, storage_state, file_id),
+        )
+        self._connection.commit()
+        return self.get_file(file_id)
+
+    def mark_storage_failed(self, file_id: int) -> StoredFile | None:
+        self._connection.execute(
+            "UPDATE files SET storage_state = 'failed' WHERE id = ?",
+            (file_id,),
+        )
+        self._connection.commit()
+        return self.get_file(file_id)
+
+    def mark_chain_pending(
+        self,
+        *,
+        file_id: int,
+        blockchain_file_id: str,
+        owner_wallet: str,
+        register_tx_hash: str | None = None,
+    ) -> StoredFile | None:
+        self._connection.execute(
+            """
+            UPDATE files
+            SET blockchain_file_id = ?, owner_wallet = ?, register_tx_hash = ?, chain_state = 'pending'
+            WHERE id = ?
+            """,
+            (blockchain_file_id, owner_wallet, register_tx_hash, file_id),
+        )
+        self._connection.commit()
+        return self.get_file(file_id)
+
+    def mark_chain_registered(
+        self,
+        *,
+        file_id: int,
+        blockchain_file_id: str,
+        owner_wallet: str,
+        register_tx_hash: str,
+        register_block_number: int,
+    ) -> StoredFile | None:
+        self._connection.execute(
+            """
+            UPDATE files
+            SET blockchain_file_id = ?,
+                owner_wallet = ?,
+                register_tx_hash = ?,
+                register_block_number = ?,
+                chain_state = 'registered'
+            WHERE id = ?
+            """,
+            (blockchain_file_id, owner_wallet, register_tx_hash, register_block_number, file_id),
+        )
+        self._connection.commit()
+        return self.get_file(file_id)
+
+    def mark_chain_failed(self, file_id: int) -> StoredFile | None:
+        self._connection.execute(
+            "UPDATE files SET chain_state = 'failed' WHERE id = ?",
+            (file_id,),
+        )
+        self._connection.commit()
+        return self.get_file(file_id)
+
+    def mark_chain_deleted(
+        self,
+        *,
+        file_id: int,
+        register_tx_hash: str | None = None,
+        register_block_number: int | None = None,
+    ) -> StoredFile | None:
+        self._connection.execute(
+            """
+            UPDATE files
+            SET chain_state = 'deleted',
+                register_tx_hash = COALESCE(?, register_tx_hash),
+                register_block_number = COALESCE(?, register_block_number)
+            WHERE id = ?
+            """,
+            (register_tx_hash, register_block_number, file_id),
+        )
+        self._connection.commit()
+        return self.get_file(file_id)
+
     def upsert_synced_file(self, *, name: str, size_bytes: int, mime_type: str | None, telegram_channel_id: int, telegram_message_id: int, telegram_file_id: str) -> StoredFile:
         existing = self._connection.execute(
             "SELECT id FROM files WHERE telegram_channel_id = ? AND telegram_message_id = ?",
@@ -62,6 +160,13 @@ class FileRepository:
     def get_file(self, file_id: int) -> StoredFile | None:
 
         row = self._connection.execute("SELECT * FROM files WHERE id = ?", (file_id,)).fetchone()
+        return None if row is None else self._row_to_model(row)
+
+    def get_file_by_blockchain_id(self, blockchain_file_id: str) -> StoredFile | None:
+        row = self._connection.execute(
+            "SELECT * FROM files WHERE blockchain_file_id = ?",
+            (blockchain_file_id,),
+        ).fetchone()
         return None if row is None else self._row_to_model(row)
 
     def list_files(self, folder_id: int | None = None) -> list[StoredFile]:
@@ -277,6 +382,14 @@ class FileRepository:
             share_token=row["share_token"] if "share_token" in row.keys() else None,
             starred=bool(row["starred"]) if "starred" in row.keys() else False,
             deleted_at=row["deleted_at"] if "deleted_at" in row.keys() else None,
+            blockchain_file_id=row["blockchain_file_id"] if "blockchain_file_id" in row.keys() else None,
+            content_hash=row["content_hash"] if "content_hash" in row.keys() else None,
+            wrapped_key=row["wrapped_key"] if "wrapped_key" in row.keys() else None,
+            storage_state=row["storage_state"] if "storage_state" in row.keys() else "pending",
+            chain_state=row["chain_state"] if "chain_state" in row.keys() else "not_submitted",
+            register_tx_hash=row["register_tx_hash"] if "register_tx_hash" in row.keys() else None,
+            register_block_number=row["register_block_number"] if "register_block_number" in row.keys() else None,
+            owner_wallet=row["owner_wallet"] if "owner_wallet" in row.keys() else None,
         )
 
 

@@ -36,3 +36,5 @@ named tunnel + your own domain on the Cloudflare free plan.
 - `TGS3_SECURE_COOKIE=1` (default) works over the tunnel's HTTPS.
 - For LAN-only use (no tunnel), visit `http://<home-ip>:8000` and set
   `TGS3_SECURE_COOKIE=0` so the cookie works over plain HTTP.
+- Blockchain demo mode is intended for a local Anvil network. Do not expose
+  local private keys or Anvil RPC endpoints through a public tunnel.

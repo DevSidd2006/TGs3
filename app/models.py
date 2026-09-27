@@ -17,6 +17,14 @@ class StoredFile:
     share_token: str | None = None
     starred: bool = False
     deleted_at: str | None = None
+    blockchain_file_id: str | None = None
+    content_hash: str | None = None
+    wrapped_key: str | None = None
+    storage_state: str = "pending"
+    chain_state: str = "not_submitted"
+    register_tx_hash: str | None = None
+    register_block_number: int | None = None
+    owner_wallet: str | None = None
 
 
 @dataclass(frozen=True)

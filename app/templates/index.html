@@ -21,6 +21,7 @@
 
     <!-- Right Header Actions -->
     <div class="header-right">
+      <button class="icon-btn wallet-connect-btn" id="wallet-connect" title="Connect wallet"><i class="ph-bold ph-wallet"></i></button>
       <button class="icon-btn" id="sync-btn" title="Sync from Telegram Channel" onclick="syncChannel()"><i class="ph-bold ph-arrows-clockwise" id="sync-icon"></i></button>
       <button class="icon-btn" id="theme-toggle-btn" title="Toggle theme (Light / Dark)"><i class="ph-bold ph-moon" id="theme-toggle-icon"></i></button>
     </div>
@@ -252,6 +253,7 @@
                     </div>
                     <a href="/view/files/{{ file.id }}" class="file-title-link" title="{{ file.name }}">{{ file.name }}</a>
                     {% if file.starred %}<i class="ph-fill ph-star star-indicator" title="Starred"></i>{% endif %}
+                    {% if file.blockchain_file_id %}<span class="chain-badge chain-{{ file.chain_state }}" title="Blockchain status">{{ file.chain_state.replace('_', ' ') }}</span>{% endif %}
                   </div>
                 </td>
                 <td><span class="file-size-text">{{ file.size_bytes | format_bytes }}</span></td>

@@ -2,6 +2,22 @@ from pathlib import Path
 import sqlite3
 
 
+FILE_COLUMN_MIGRATIONS: dict[str, str] = {
+    "folder_id": "ALTER TABLE files ADD COLUMN folder_id INTEGER REFERENCES folders(id)",
+    "share_token": "ALTER TABLE files ADD COLUMN share_token TEXT",
+    "starred": "ALTER TABLE files ADD COLUMN starred INTEGER NOT NULL DEFAULT 0",
+    "deleted_at": "ALTER TABLE files ADD COLUMN deleted_at TEXT",
+    "blockchain_file_id": "ALTER TABLE files ADD COLUMN blockchain_file_id TEXT",
+    "content_hash": "ALTER TABLE files ADD COLUMN content_hash TEXT",
+    "wrapped_key": "ALTER TABLE files ADD COLUMN wrapped_key TEXT",
+    "storage_state": "ALTER TABLE files ADD COLUMN storage_state TEXT NOT NULL DEFAULT 'pending'",
+    "chain_state": "ALTER TABLE files ADD COLUMN chain_state TEXT NOT NULL DEFAULT 'not_submitted'",
+    "register_tx_hash": "ALTER TABLE files ADD COLUMN register_tx_hash TEXT",
+    "register_block_number": "ALTER TABLE files ADD COLUMN register_block_number INTEGER",
+    "owner_wallet": "ALTER TABLE files ADD COLUMN owner_wallet TEXT",
+}
+
+
 def connect_db(path: Path) -> sqlite3.Connection:
     path.parent.mkdir(parents=True, exist_ok=True)
     connection = sqlite3.connect(path, check_same_thread=False)
@@ -36,19 +52,15 @@ def ensure_schema(connection: sqlite3.Connection) -> None:
         """
     )
     file_columns = {row["name"] for row in connection.execute("PRAGMA table_info(files)")}
-    if "folder_id" not in file_columns:
-        connection.execute("ALTER TABLE files ADD COLUMN folder_id INTEGER REFERENCES folders(id)")
-    if "share_token" not in file_columns:
-        connection.execute("ALTER TABLE files ADD COLUMN share_token TEXT")
-        connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_share_token ON files(share_token)")
-    if "starred" not in file_columns:
-        connection.execute("ALTER TABLE files ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
-    if "deleted_at" not in file_columns:
-        connection.execute("ALTER TABLE files ADD COLUMN deleted_at TEXT")
+    for column, migration in FILE_COLUMN_MIGRATIONS.items():
+        if column not in file_columns:
+            connection.execute(migration)
 
     folder_columns = {row["name"] for row in connection.execute("PRAGMA table_info(folders)")}
     if "starred" not in folder_columns:
         connection.execute("ALTER TABLE folders ADD COLUMN starred INTEGER NOT NULL DEFAULT 0")
+    connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_share_token ON files(share_token)")
+    connection.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_blockchain_file_id ON files(blockchain_file_id)")
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS users (
